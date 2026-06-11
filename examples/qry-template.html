@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>qry app — template</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23005395' stroke-width='2'><polygon points='13 2 3 14 12 14 11 22 21 10 12 10 13 2'/></svg>">
+
+    <!-- Shoelace (widgets) — load BOTH themes so dark mode works -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+
+    <!-- qry-ui.css (shell) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Bloechle/qry@1.0.0/qry-ui.css">
+
+    <!-- Lucide (icons) -->
+    <script src="https://cdn.jsdelivr.net/npm/lucide@1.17.0/dist/umd/lucide.min.js"></script>
+
+    <!-- qry.js core (global $) -->
+    <script src="https://cdn.jsdelivr.net/gh/Bloechle/qry@1.0.0/qry.js"></script>
+
+    <style>
+        /* App-specific styles only — everything structural comes from qry-ui.css */
+        .file-drop {
+            border: 2px dashed var(--qry-blue-300);
+            border-radius: var(--qry-radius);
+            padding: 3rem 2rem;
+            text-align: center;
+            color: var(--qry-text-muted);
+            cursor: pointer;
+            transition: border-color var(--qry-transition), background var(--qry-transition);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.35rem;
+        }
+        .file-drop:hover { border-color: var(--qry-blue); background: var(--qry-tint-soft); }
+        /* Lucide swaps the <i> for an <svg> at render time — target both. */
+        .file-drop i,
+        .file-drop svg { width: 2.5rem; height: 2.5rem; color: var(--qry-blue); margin-bottom: 0.5rem; }
+        .file-drop p { margin: 0; }
+    </style>
+</head>
+
+<body class="qry-app">
+
+<!-- ── Header ──────────────────────────────────────────────────────────── -->
+<header class="qry-header fixed">
+    <h1><i data-lucide="file-search"></i> qry app</h1>
+    <button id="btn-theme" class="qry-btn" aria-label="Toggle theme"><i data-lucide="moon"></i></button>
+</header>
+
+<!-- ── Content ─────────────────────────────────────────────────────────── -->
+<main class="qry-content">
+    <div style="max-width: 720px; margin: 0 auto;">
+
+        <!-- Empty state: drop / pick a file -->
+        <div id="view-empty">
+            <div class="qry-card">
+                <div class="qry-card-body">
+                    <div id="drop" class="file-drop qry-touch-manip">
+                        <i data-lucide="upload-cloud"></i>
+                        <p><strong>Drop a file here</strong> or click to browse</p>
+                        <p class="qry-mono" style="font-size:0.75rem;">any .json / .txt / .csv …</p>
+                    </div>
+                    <input id="file-input" type="file" hidden>
+                </div>
+            </div>
+        </div>
+
+        <!-- Result state: file info -->
+        <div id="view-result" class="hidden">
+            <div class="qry-card">
+                <div class="qry-card-header">
+                    <h2 class="qry-card-title"><i data-lucide="file-text"></i> <span id="r-name">file</span></h2>
+                    <sl-button id="btn-reset" size="small">
+                        <i data-lucide="rotate-ccw" slot="prefix"></i> New file
+                    </sl-button>
+                </div>
+                <div class="qry-card-body">
+                    <div class="qry-grid qry-grid-3" style="margin-bottom: 1.25rem;">
+                        <div class="qry-metric"><div class="qry-metric-label">Type</div><div class="qry-metric-value" id="r-type">—</div></div>
+                        <div class="qry-metric"><div class="qry-metric-label">Size</div><div class="qry-metric-value" id="r-size">—</div></div>
+                        <div class="qry-metric"><div class="qry-metric-label">Lines</div><div class="qry-metric-value" id="r-lines">—</div></div>
+                    </div>
+                    <div class="qry-btn-group" style="margin-bottom: 1rem;">
+                        <button id="btn-copy" class="qry-btn-group-item">Copy content</button>
+                        <button id="btn-download" class="qry-btn-group-item">Download</button>
+                    </div>
+                    <pre id="r-preview" class="qry-code" style="max-height: 360px;"></pre>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</main>
+
+<!-- ── Footer ──────────────────────────────────────────────────────────── -->
+<footer class="qry-footer">Jean-Luc Bloechle &amp; Claude.ai</footer>
+
+<script type="module">
+    import { theme, icons, bindAll, makeKeyboard, makeDropZone, makeAutoHideHeader,
+        copy, download, toast, format, boot, str } from 'https://cdn.jsdelivr.net/gh/Bloechle/qry@1.0.0/qry-kit.js';
+
+    // ── State ──
+    let current = null;   // { name, text, ext, size }
+
+    // ── Boot: apply saved/system theme, render icons, run setup on ready ──
+    boot({
+        title: 'qry app — template',
+        ready() {
+            makeAutoHideHeader();
+            syncThemeIcon();
+            wire();
+        },
+    });
+
+    function syncThemeIcon() {
+        $('#btn-theme').html(`<i data-lucide="${theme.isDark() ? 'sun' : 'moon'}"></i>`);
+        icons();
+    }
+
+    function show(view) {
+        $('#view-empty').cls(view === 'empty' ? '-hidden' : '+hidden');
+        $('#view-result').cls(view === 'result' ? '-hidden' : '+hidden');
+    }
+
+    async function loadFile(file) {
+        let text;
+        try { text = await file.text(); }
+        catch { toast('Could not read that file', 'error'); return; }
+        text = str.stripBom(text);
+        const ext = file.name.split('.').pop().toLowerCase();
+        current = { name: file.name, text, ext, size: file.size };
+
+        $('#r-name').text(file.name);
+        $('#r-type').text(ext.toUpperCase());
+        $('#r-size').text(format.bytes(file.size));
+        $('#r-lines').text(String(text.split('\n').length));
+        $('#r-preview').text(text.slice(0, 5000));
+        show('result');
+        toast('File loaded', 'success', 1500);
+    }
+
+    function reset() { current = null; $('#file-input').val(''); show('empty'); }
+
+    function wire() {
+        bindAll({
+            '#btn-theme':    () => { theme.toggle(); syncThemeIcon(); },
+            '#drop':         () => $('#file-input').click(),
+            '#btn-reset':    () => reset(),
+            '#btn-copy':     () => current && copy(current.text),
+            '#btn-download': () => current && download(current.text, current.name, 'text/plain'),
+        });
+
+        // File picker
+        $('#file-input').on('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+
+        // Drag & drop anywhere (uses the qry-ui.css overlay)
+        makeDropZone(document.body, {
+            label: 'Drop a file to analyze',
+            onFiles: files => files[0] && loadFile(files[0]),
+        });
+
+        // Keyboard: Ctrl/⌘+O open, Ctrl/⌘+N reset, Ctrl/⌘+K toggle theme
+        const keys = makeKeyboard();
+        keys.on('o', () => $('#file-input').click(),            { ctrl: true });
+        keys.on('n', () => reset(),                             { ctrl: true });
+        keys.on('k', () => { theme.toggle(); syncThemeIcon(); }, { ctrl: true });
+    }
+</script>
+</body>
+</html>

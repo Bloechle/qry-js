@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>qry-kit · demo</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23005395' stroke-width='2'><polygon points='13 2 3 14 12 14 11 22 21 10 12 10 13 2'/></svg>">
+
+    <!-- Shoelace (widgets) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+
+    <!-- qry-ui.css (app shell) -->
+    <link rel="stylesheet" href="../qry-ui.css">
+
+    <!-- Lucide (icons) -->
+    <script src="https://cdn.jsdelivr.net/npm/lucide@1.17.0/dist/umd/lucide.min.js"></script>
+
+    <!-- qry.js core (provides global $) -->
+    <script src="../qry.js"></script>
+
+    <style>
+        /* demo-only tweaks — everything else comes from qry-ui.css */
+        .demo-out {
+            font: 0.8rem var(--qry-font-mono, ui-monospace, monospace);
+            background: var(--qry-blue-50, #e8f1f9);
+            color: var(--qry-blue-700, #00325b);
+            border-radius: var(--qry-radius-sm, 6px);
+            padding: 0.5rem 0.75rem;
+            min-height: 1.2rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .demo-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem; }
+        .demo-row:last-child { margin-bottom: 0; }
+        .demo-api-note { font-size: 0.75rem; color: #64748b; }
+        section[id] { scroll-margin-top: calc(var(--qry-header-h, 56px) + 1rem); display: block; margin-bottom: 1.5rem; }
+        section[id]:last-of-type { margin-bottom: 0; }
+
+        /* Back-to-top floating button */
+        #to-top {
+            position: fixed;
+            right: 1.5rem;
+            bottom: 1.5rem;
+            width: 2.75rem;
+            height: 2.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--qry-glass-border);
+            border-radius: 50%;
+            background: var(--qry-blue);
+            color: var(--qry-text-on-accent);
+            box-shadow: var(--qry-shadow-lg);
+            cursor: pointer;
+            z-index: 200;
+            opacity: 0;
+            transform: translateY(0.5rem) scale(0.9);
+            pointer-events: none;
+            transition: opacity var(--qry-transition), transform var(--qry-transition);
+        }
+        #to-top.visible { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+        #to-top:hover { background: var(--qry-blue-600); }
+        #to-top i, #to-top svg { width: 1.2rem; height: 1.2rem; }
+    </style>
+</head>
+
+<body class="qry-app">
+
+<header class="qry-header fixed">
+    <h1><i data-lucide="zap"></i> qry-kit <span class="qry-mono" style="font-size:0.7rem;opacity:0.6">v1.0.0</span></h1>
+    <div style="display:flex;gap:0.25rem;align-items:center">
+        <button id="btn-theme" class="qry-btn" aria-label="Toggle theme"><i data-lucide="moon"></i></button>
+        <a class="qry-btn" href="https://github.com/Bloechle/qry" target="_blank" rel="noopener" aria-label="GitHub"><svg viewBox="0 0 24 24" width="1.1rem" height="1.1rem" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-1.7c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg></a>
+    </div>
+</header>
+
+<div class="qry-dashboard">
+
+    <aside class="qry-sidebar" id="sidebar">
+        <div class="qry-sidebar-body">
+            <nav class="qry-sidebar-nav">
+                <div class="qry-sidebar-label">Modules</div>
+                <a class="qry-sidebar-link" href="#timing"><i data-lucide="clock"></i><span class="qry-sidebar-text">timing &amp; util</span></a>
+                <a class="qry-sidebar-link" href="#format"><i data-lucide="ruler"></i><span class="qry-sidebar-text">format</span></a>
+                <a class="qry-sidebar-link" href="#store"><i data-lucide="database"></i><span class="qry-sidebar-text">storage</span></a>
+                <a class="qry-sidebar-link" href="#theme"><i data-lucide="palette"></i><span class="qry-sidebar-text">theme</span></a>
+                <a class="qry-sidebar-link" href="#toast"><i data-lucide="bell"></i><span class="qry-sidebar-text">toast / confirm</span></a>
+                <a class="qry-sidebar-link" href="#api"><i data-lucide="cloud"></i><span class="qry-sidebar-text">api</span></a>
+                <a class="qry-sidebar-link" href="#keyboard"><i data-lucide="keyboard"></i><span class="qry-sidebar-text">keyboard</span></a>
+                <a class="qry-sidebar-link" href="#bind"><i data-lucide="link"></i><span class="qry-sidebar-text">bindAll</span></a>
+                <a class="qry-sidebar-link" href="#files"><i data-lucide="file-up"></i><span class="qry-sidebar-text">files / drop</span></a>
+            </nav>
+        </div>
+        <div class="qry-sidebar-foot">
+            <a class="qry-sidebar-link" href="https://github.com/Bloechle/qry" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24" width="1.1rem" height="1.1rem" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-1.7c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg><span class="qry-sidebar-text">View on GitHub</span>
+            </a>
+        </div>
+    </aside>
+
+    <main class="qry-content">
+
+        <!-- ── timing & util ─────────────────────────────────────────── -->
+        <section id="timing">
+            <div class="qry-card">
+                <div class="qry-card-header"><h2 class="qry-card-title"><i data-lucide="clock"></i> Timing &amp; util</h2></div>
+                <div class="qry-card-body">
+                    <p class="qry-card-desc"><code class="qry-code-inline">sleep</code>, <code class="qry-code-inline">clamp</code>, <code class="qry-code-inline">scale</code>, <code class="qry-code-inline">stamp</code>, <code class="qry-code-inline">throttle</code>, <code class="qry-code-inline">debounce</code></p>
+
+                    <div class="demo-row">
+                        <sl-button id="b-sleep" size="small" variant="primary">await sleep(800)</sl-button>
+                        <span id="o-sleep" class="demo-out" style="flex:1">idle</span>
+                    </div>
+                    <div class="demo-row">
+                        <span class="qry-mono">clamp(x, 0, 10):</span>
+                        <sl-input id="i-clamp" type="number" value="15" size="small" style="width:90px"></sl-input>
+                        <span id="o-clamp" class="demo-out" style="flex:1">—</span>
+                    </div>
+                    <div class="demo-row">
+                        <span class="qry-mono">scale(x, 0,1 → 0,100):</span>
+                        <sl-range id="i-scale" min="0" max="1" step="0.01" value="0.5" style="flex:1;min-width:160px"></sl-range>
+                        <span id="o-scale" class="demo-out" style="width:64px;text-align:center">50</span>
+                    </div>
+                    <div class="demo-row">
+                        <sl-button id="b-stamp" size="small">stamp()</sl-button>
+                        <span id="o-stamp" class="demo-out" style="flex:1">—</span>
+                    </div>
+                    <div class="demo-row">
+                        <span class="qry-mono">type — debounced (250ms) &amp; throttled (250ms):</span>
+                    </div>
+                    <div class="demo-row">
+                        <sl-input id="i-type" placeholder="type fast…" size="small" style="flex:1"></sl-input>
+                    </div>
+                    <div class="demo-row">
+                        <span class="demo-out" style="flex:1">debounce fires: <b id="o-deb">0</b></span>
+                        <span class="demo-out" style="flex:1">throttle fires: <b id="o-thr">0</b></span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── format ────────────────────────────────────────────────── -->
+        <section id="format">
+            <div class="qry-card">
+                <div class="qry-card-header"><h2 class="qry-card-title"><i data-lucide="ruler"></i> format</h2></div>
+                <div class="qry-card-body">
+                    <p class="qry-card-desc">Pure display formatters: <code class="qry-code-inline">format.duration</code>, <code class="qry-code-inline">format.bytes</code>, <code class="qry-code-inline">format.date</code></p>
+                    <div class="qry-grid qry-grid-3">
+                        <div class="qry-metric"><div class="qry-metric-label">duration(90000)</div><div class="qry-metric-value" id="o-dur">—</div></div>
+                        <div class="qry-metric"><div class="qry-metric-label">bytes(1536000)</div><div class="qry-metric-value" id="o-byt">—</div></div>
+                        <div class="qry-metric"><div class="qry-metric-label">date(now)</div><div class="qry-metric-value qry-mono" id="o-dat" style="font-size:0.8rem">—</div></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── storage ───────────────────────────────────────────────── -->
+        <section id="store">
+            <div class="qry-card">
+                <div class="qry-card-header"><h2 class="qry-card-title"><i data-lucide="database"></i> storage</h2></div>
+                <div class="qry-card-body">
+                    <p class="qry-card-desc"><code class="qry-code-inline">makeStore('demo_')</code> — prefixed localStorage with JSON. Reload the page to verify persistence.</p>
+                    <div class="demo-row">
+                        <sl-input id="i-store" placeholder="value to persist" size="small" style="flex:1"></sl-input>
+                        <sl-button id="b-store-set" size="small" variant="primary">set</sl-button>
+                        <sl-button id="b-store-get" size="small">get</sl-button>
+                        <sl-button id="b-store-del" size="small" variant="danger">remove</sl-button>
+                    </div>
+                    <div id="o-store" class="demo-out">—</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── theme ─────────────────────────────────────────────────── -->
+        <section id="theme">
+            <div class="qry-card">
+                <div class="qry-card-header"><h2 class="qry-card-title"><i data-lucide="palette"></i> theme</h2></div>
+                <div class="qry-card-body">
+                    <p class="qry-card-desc">One switch drives <b>both</b> layers: <code class="qry-code-inline">data-theme</code> (qry-ui.css tokens) and <code class="qry-code-inline">sl-theme-dark</code> (every Shoelace widget). Persisted via storage.</p>
+                    <div class="demo-row">
+                        <sl-button id="b-theme-light" size="small">theme.set('light')</sl-button>
+                        <sl-button id="b-theme-dark" size="small">theme.set('dark')</sl-button>
+                        <sl-button id="b-theme-toggle" size="small" variant="primary">theme.toggle()</sl-button>
+                    </div>
+                    <div class="demo-row">
+                        <span class="demo-out" style="flex:1">isDark(): <b id="o-theme">—</b></span>
+                        <sl-switch id="sw-demo">a Shoelace switch (re-themes live)</sl-switch>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── toast / confirm ───────────────────────────────────────── -->
+        <section id="toast">
+            <div class="qry-card">
+                <div class="qry-card-header"><h2 class="qry-card-title"><i data-lucide="bell"></i> toast / confirm</h2></div>
+                <div class="qry-card-body">
+                    <p class="qry-card-desc"><code class="qry-code-inline">toast</code> wraps <code class="qry-code-inline">&lt;sl-alert&gt;</code>; <code class="qry-code-inline">confirm</code> wraps <code class="qry-code-inline">&lt;sl-dialog&gt;</code> as a Promise. No injected CSS — pure Shoelace.</p>
+                    <div class="demo-row">
+                        <sl-button id="b-t-success" size="small" variant="success">success</sl-button>
+                        <sl-button id="b-t-info" size="small" variant="primary">info</sl-button>
+                        <sl-button id="b-t-warn" size="small" variant="warning">warn</sl-button>
+                        <sl-button id="b-t-error" size="small" variant="danger">error</sl-button>
+                    </div>
+                    <div class="demo-row">
+                        <sl-button id="b-confirm" size="small">await confirm(…)</sl-button>
+                        <span id="o-confirm" class="demo-out" style="flex:1">—</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── api ───────────────────────────────────────────────────── -->
+        <section id="api">
+            <div class="qry-card">
+                <div class="qry-card-header"><h2 class="qry-card-title"><i data-lucide="cloud"></i> api</h2></div>
+                <div class="qry-card-body">
+                    <p class="qry-card-desc"><code class="qry-code-inline">api(path, {base})</code> — fetch → JSON, throws on non-2xx. Live call to a public test endpoint.</p>
+                    <div class="demo-row">
+                        <sl-button id="b-api" size="small" variant="primary">GET /todos/1</sl-button>
+                        <sl-button id="b-api-err" size="small" variant="danger">GET /404 (throws)</sl-button>
+                    </div>
+                    <div id="o-api" class="demo-out">—</div>
+                    <p class="demo-api-note">base: https://jsonplaceholder.typicode.com — requires network.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── keyboard ──────────────────────────────────────────────── -->
+        <section id="keyboard">
+            <div class="qry-card">
+                <div class="qry-card-header"><h2 class="qry-card-title"><i data-lucide="keyboard"></i> keyboard</h2></div>
+                <div class="qry-card-body">
+                    <p class="qry-card-desc"><code class="qry-code-inline">makeKeyboard()</code> — global shortcuts, auto-skipped while typing in a field.</p>
+                    <div class="demo-row">
+                        <span class="qry-chip"><span class="qry-chip-dot"></span> press <b>g</b></span>
+                        <span class="qry-chip"><span class="qry-chip-dot"></span> press <b>Ctrl/⌘ + k</b></span>
+                        <span class="qry-chip"><span class="qry-chip-dot"></span> <b>?</b> for a toast</span>
+                    </div>
+                    <div id="o-key" class="demo-out">last shortcut: —</div>
+                    <div class="demo-row" style="margin-top:0.75rem">
+                        <sl-input placeholder="focus me — shortcuts are suppressed here" size="small" style="flex:1"></sl-input>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── bindAll ───────────────────────────────────────────────── -->
+        <section id="bind">
+            <div class="qry-card">
+                <div class="qry-card-header"><h2 class="qry-card-title"><i data-lucide="link"></i> bindAll</h2></div>
+                <div class="qry-card-body">
+                    <p class="qry-card-desc"><code class="qry-code-inline">bindAll</code> binds a <code class="qry-code-inline">{ 'selector @event': fn }</code> map. Default event is click; <code class="qry-code-inline">@input</code> etc. opt into others.</p>
+                    <div class="demo-row">
+                        <button id="bind-click" class="qry-btn">#bind-click (click)</button>
+                        <sl-input id="bind-input" placeholder="#bind-input @input" size="small" style="flex:1"></sl-input>
+                    </div>
+                    <div id="o-bind" class="demo-out">—</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── files / drop ──────────────────────────────────────────── -->
+        <section id="files">
+            <div class="qry-card">
+                <div class="qry-card-header"><h2 class="qry-card-title"><i data-lucide="file-up"></i> files / drop</h2></div>
+                <div class="qry-card-body">
+                    <p class="qry-card-desc"><code class="qry-code-inline">readFiles</code> parses <code class="qry-code-inline">.json</code> + <code class="qry-code-inline">.zip</code> (BOM-tolerant); <code class="qry-code-inline">makeDropZone</code> wires the <code class="qry-code-inline">.qry-drop-overlay</code>. Drop files anywhere on the page, or pick them below.</p>
+                    <div class="demo-row">
+                        <sl-button id="b-pick" size="small" variant="primary"><i data-lucide="folder-open" slot="prefix"></i> Choose .json / .zip</sl-button>
+                        <input id="file-input" type="file" accept=".json,.zip" multiple hidden>
+                        <span class="demo-api-note">…or drag files onto the window</span>
+                    </div>
+                    <div id="o-files" class="demo-out">no files loaded yet</div>
+                    <p class="demo-api-note">ZIP support requires JSZip (loaded in the page head).</p>
+                </div>
+            </div>
+        </section>
+
+
+        qry.js (CDN) · Shoelace · qry-ui.css · qry-kit.js — all 28 exports demonstrated above
+        </p>
+    </main>
+</div>
+
+<button id="to-top" aria-label="Back to top"><i data-lucide="arrow-up"></i></button>
+
+<script type="module">
+    import {
+        sleep, clamp, scale, stamp, throttle, debounce,
+        format, makeStore, theme, icons, api, toast, confirm,
+        makeSidebar, makeAutoHideHeader, makeKeyboard, bindAll, boot,
+        readFiles, makeDropZone,
+    } from '../qry-kit.js';
+
+    // boot() — applies saved/system theme, renders icons on ready, runs setup
+    boot({
+        title: 'qry-kit · demo',
+        ready() {
+            wire();
+            makeAutoHideHeader();        // header retracts on scroll-down
+            // makeSidebar — present so its API is exercised even on desktop
+            makeSidebar('#sidebar');
+            // makeDropZone — drop files anywhere; readFiles parses them
+            makeDropZone(document.body, { label: 'Drop .json or .zip', onFiles: loadFiles });
+            setupScroll();
+            syncTheme();
+        },
+    });
+
+    const store = makeStore('demo_');
+
+    // readFiles → summarise what came in (shared by picker + drop zone)
+    async function loadFiles(files) {
+        $('#o-files').text(`reading ${files.length} file(s)…`);
+        const items = await readFiles(files, {
+            onError: (name, err) => toast(`${name}: ${err.message}`, 'error'),
+        });
+        if (!items.length) { $('#o-files').text('no valid JSON found'); return; }
+        const lines = items.map(({ name, data }) => {
+            const cols = data && typeof data === 'object' ? Object.keys(data).slice(0, 6).join(', ') : typeof data;
+            return `• ${name} → { ${cols} }`;
+        });
+        $('#o-files').text(`parsed ${items.length} JSON payload(s):\n${lines.join('\n')}`);
+        toast(`Loaded ${items.length} file(s)`, 'success');
+    }
+
+    // Smooth in-container scrolling for sidebar anchors + back-to-top button.
+    // The scroll container is .qry-content (overflow-y:auto), not the window.
+    function setupScroll() {
+        const toTop = document.getElementById('to-top');
+        if (!toTop) return;
+
+        // The shell's .qry-content only scrolls itself when its height is
+        // bounded; on a free-flowing doc page the window scrolls instead.
+        // Detect which one is actually scrollable and listen to that.
+        const content = document.querySelector('.qry-content');
+        const usesContent = content
+            && /(auto|scroll|overlay)/.test(getComputedStyle(content).overflowY)
+            && content.scrollHeight > content.clientHeight + 1;
+
+        const getY    = usesContent ? () => content.scrollTop : () => window.scrollY;
+        const scrollTarget = usesContent ? content : window;
+        const toTopOf = () => (usesContent ? content : window)
+            .scrollTo({ top: 0, behavior: 'smooth' });
+
+        bindAll({
+            '.qry-sidebar-link @click': e => {
+                const href = e.currentTarget.getAttribute('href') || '';
+                if (!href.startsWith('#')) return;
+                const target = document.getElementById(href.slice(1));
+                if (!target) return;
+                e.preventDefault();
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                history.replaceState(null, '', href);
+            },
+            '#to-top @click': toTopOf,
+        });
+
+        // Reveal the button once scrolled down a bit
+        const onScroll = throttle(() => {
+            toTop.classList.toggle('visible', getY() > 320);
+        }, 150);
+        scrollTarget.addEventListener('scroll', onScroll, { passive: true });
+        onScroll();
+    }
+
+    function syncTheme() {
+        $('#o-theme').text(String(theme.isDark()));
+        $('#btn-theme').html(`<i data-lucide="${theme.isDark() ? 'sun' : 'moon'}"></i>`);
+        icons();
+    }
+
+    function wire() {
+        // — timing & util —
+        bindAll({
+            '#b-sleep': async () => {
+                $('#o-sleep').text('sleeping…');
+                const t0 = performance.now();
+                await sleep(800);
+                $('#o-sleep').text(`woke after ${Math.round(performance.now() - t0)}ms`);
+            },
+            '#b-stamp': () => $('#o-stamp').text(stamp()),
+            '#btn-theme': () => { theme.toggle(); syncTheme(); },
+            '#b-theme-light': () => { theme.set('light'); syncTheme(); },
+            '#b-theme-dark': () => { theme.set('dark'); syncTheme(); },
+            '#b-theme-toggle': () => { theme.toggle(); syncTheme(); },
+            '#b-store-set': () => { store.set('val', $('#i-store').val()); $('#o-store').text(`set demo_val = ${JSON.stringify($('#i-store').val())}`); },
+            '#b-store-get': () => $('#o-store').text(`get demo_val → ${JSON.stringify(store.get('val'))}`),
+            '#b-store-del': () => { store.remove('val'); $('#o-store').text('removed demo_val'); },
+            '#b-t-success': () => toast('Saved successfully', 'success'),
+            '#b-t-info':    () => toast('Just so you know', 'info'),
+            '#b-t-warn':    () => toast('Careful with that', 'warn', 5000),
+            '#b-t-error':   () => toast('Something failed', 'error'),
+            '#b-confirm':   async () => { const ok = await confirm('Proceed with the demo action?', { label: 'Confirm action' }); $('#o-confirm').text(`resolved → ${ok}`); },
+            '#b-api':       async () => { try { const d = await api('/todos/1', { base: 'https://jsonplaceholder.typicode.com' }); $('#o-api').text(JSON.stringify(d, null, 2)); } catch (e) { $('#o-api').text('Error: ' + e.message); } },
+            '#b-api-err':   async () => { try { await api('/nope-404', { base: 'https://jsonplaceholder.typicode.com' }); } catch (e) { $('#o-api').text('threw as expected → ' + e.message); } },
+            '#b-pick':      () => document.getElementById('file-input').click(),
+        });
+
+        // file picker → loadFiles (mirrors the drop zone)
+        $('#file-input').on('change', e => { if (e.target.files.length) loadFiles(e.target.files); });
+
+        // clamp — live on input
+        const clampOut = () => $('#o-clamp').text(String(clamp(Number($('#i-clamp').val()), 0, 10)));
+        $('#i-clamp').on('sl-input', clampOut); clampOut();
+
+        // scale — live on range
+        const scaleOut = () => $('#o-scale').text(String(Math.round(scale(Number($('#i-scale').val()), 0, 1, 0, 100))));
+        $('#i-scale').on('sl-input', scaleOut); scaleOut();
+
+        // debounce vs throttle — count fires while typing
+        let deb = 0, thr = 0;
+        const onDeb = debounce(() => $('#o-deb').text(String(++deb)), 250);
+        const onThr = throttle(() => $('#o-thr').text(String(++thr)), 250);
+        $('#i-type').on('sl-input', () => { onDeb(); onThr(); });
+
+        // format — static demo values
+        $('#o-dur').text(format.duration(90000));
+        $('#o-byt').text(format.bytes(1536000));
+        $('#o-dat').text(format.date(Date.now()));
+
+        // Shoelace switch mirrors theme (shows widgets re-theme live)
+        $('#sw-demo').on('sl-change', e => { theme.set(e.target.checked ? 'dark' : 'light'); syncTheme(); });
+
+        // keyboard — global shortcuts
+        const keys = makeKeyboard();
+        keys.on('g', () => $('#o-key').text('last shortcut: g'));
+        keys.on('k', () => $('#o-key').text('last shortcut: Ctrl/⌘ + k'), { ctrl: true });
+        keys.on('?', () => { $('#o-key').text('last shortcut: ?'); toast('Keyboard shortcut fired', 'info'); });
+
+        // bindAll — custom @event demo
+        bindAll({
+            '#bind-click':        () => $('#o-bind').text('click bound via bindAll'),
+            '#bind-input @input': e => $('#o-bind').text(`@input → "${e.target.value}"`),
+        });
+
+        icons();
+    }
+</script>
+</body>
+</html>

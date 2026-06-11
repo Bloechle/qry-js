@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>qry.js — the DOM library where $() is a real element</title>
+<meta name="description" content="Ultra-light, prototype-based DOM library. $() returns native elements — no wrapper, fully chainable, zero dependencies.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23005395' stroke-width='2'><polygon points='13 2 3 14 12 14 11 22 21 10 12 10 13 2'/></svg>">
+<style>
+    :root {
+        --azure: #005395;
+        --azure-lt: #2b7fc4;
+        --azure-soft: rgba(0, 83, 149, 0.07);
+        --ink: #0f1b28;
+        --muted: #5d6e7e;
+        --line: #d8e1ea;
+        --bg: #f3f7fb;
+        --paper: #ffffff;
+        --navy: #0c1a2b;
+        --navy-fg: #e9f1fa;
+        --green: #1c8c57;
+        --brick: #b0413f;
+        --radius: 14px;
+        --mono: "SF Mono", ui-monospace, "Cascadia Code", "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; font: 16px/1.65 var(--sans); color: var(--ink); background: var(--bg); }
+    code, pre, .mono { font-family: var(--mono); }
+    a { color: var(--azure); }
+
+    header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 16px 28px; border-bottom: 1px solid var(--line);
+        background: rgba(255,255,255,.82); backdrop-filter: blur(8px);
+        position: sticky; top: 0; z-index: 20;
+    }
+    header img { height: 32px; width: auto; display: block; }
+    header nav { display: flex; align-items: center; gap: 20px; }
+    header nav a { color: var(--ink); text-decoration: none; font-weight: 600; font-size: .92rem; }
+    header nav a:hover { color: var(--azure); }
+    .tag { font: 600 .72rem/1 var(--mono); color: var(--azure); background: var(--azure-soft);
+           border: 1px solid var(--line); padding: 5px 9px; border-radius: 999px; }
+
+    .hero { max-width: 920px; margin: 0 auto; padding: 76px 24px 44px; }
+    .wordmark { font: 800 clamp(3rem, 11vw, 6rem)/0.9 var(--mono); letter-spacing: -.04em; margin: 0; }
+    .wordmark .dot { color: var(--azure); }
+    .wordmark .ext { color: var(--muted); font-weight: 500; }
+    .hero .pitch { font-size: clamp(1.15rem, 2.4vw, 1.55rem); color: var(--ink); max-width: 620px; margin: 24px 0 6px; line-height: 1.4; }
+    .hero .pitch b { color: var(--azure); font-weight: 700; }
+    .hero .sub { color: var(--muted); margin: 0 0 32px; max-width: 600px; }
+
+    .repl { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+            background: var(--paper); box-shadow: 0 18px 40px -28px rgba(12,26,43,.5); }
+    .repl-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+                background: var(--navy); color: var(--navy-fg); font: .8rem/1 var(--mono); }
+    .repl-bar .dotrow { display: flex; gap: 6px; margin-right: 6px; }
+    .repl-bar .dotrow i { width: 11px; height: 11px; border-radius: 50%; background: #2d4358; display: block; }
+    .repl-bar .dotrow i:first-child { background: var(--brick); }
+    .repl-bar .label { opacity: .65; }
+    .repl-input { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); }
+    .repl-input span { padding: 14px 10px 14px 16px; color: var(--azure); font: 700 1rem/1.4 var(--mono); user-select: none; }
+    .repl-input input { flex: 1; border: 0; outline: 0; font: 1rem/1.4 var(--mono); color: var(--ink);
+                        padding: 14px 8px; background: transparent; min-width: 0; }
+    .repl-input button { border: 0; background: var(--azure); color: #fff; font: 700 .9rem var(--sans);
+                         padding: 0 22px; cursor: pointer; transition: background .15s; }
+    .repl-input button:hover { background: var(--azure-lt); }
+    .repl-stage { display: grid; grid-template-columns: 1fr 1fr; gap: 0; min-height: 132px; }
+    @media (max-width: 620px) { .repl-stage { grid-template-columns: 1fr; } }
+    .repl-target-wrap { display: flex; align-items: center; justify-content: center; padding: 24px;
+                        border-right: 1px solid var(--line); }
+    @media (max-width: 620px) { .repl-target-wrap { border-right: 0; border-bottom: 1px solid var(--line); } }
+    #demo-el { padding: 18px 26px; border-radius: 12px; background: var(--azure); color: #fff;
+               font: 700 1.05rem var(--mono); transition: all .35s cubic-bezier(.2,.8,.2,1); }
+    #demo-el.glow { box-shadow: 0 0 0 6px rgba(0,83,149,.18), 0 0 30px rgba(43,127,196,.6); }
+    .repl-console { padding: 16px 18px; background: #f7fafd; font: .82rem/1.7 var(--mono); overflow: auto; }
+    .repl-console .line { white-space: pre-wrap; word-break: break-word; }
+    .repl-console .ret { color: var(--green); }
+    .repl-console .err { color: var(--brick); }
+    .repl-console .dim { color: var(--muted); }
+    .repl-hint { font-size: .9rem; color: var(--muted); margin: 14px 0 0; }
+    .repl-hint b { color: var(--azure); }
+    .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+    .chips .lbl { font: 600 .8rem var(--mono); color: var(--muted); }
+    .chip { font: .82rem var(--mono); color: var(--azure); background: var(--paper);
+            border: 1px solid var(--line); padding: 6px 11px; border-radius: 8px; cursor: pointer; transition: all .15s; }
+    .chip:hover { border-color: var(--azure); background: var(--azure-soft); }
+
+    .stats { max-width: 920px; margin: 0 auto; padding: 0 24px;
+             display: flex; flex-wrap: wrap; gap: 28px; color: var(--muted); font: .9rem var(--mono); }
+    .stats b { color: var(--ink); font-weight: 700; }
+
+    section.block { max-width: 1080px; margin: 0 auto; padding: 68px 24px; }
+    .eyebrow { font: 700 .78rem/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--azure); margin: 0 0 10px; }
+    h2.title { font: 700 clamp(1.5rem, 3.5vw, 2.2rem)/1.1 var(--sans); letter-spacing: -.02em; margin: 0 0 8px; }
+    .block > p.intro { color: var(--muted); max-width: 620px; margin: 0 0 30px; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 26px; }
+    .spec { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+            background: var(--paper); display: flex; flex-direction: column;
+            opacity: 0; transform: translateY(14px); transition: opacity .5s, transform .5s; }
+    .spec.in { opacity: 1; transform: none; }
+    .spec h3 { font: 700 .98rem var(--sans); margin: 0; padding: 16px 18px 0; }
+    .spec h3 em { font-style: normal; color: var(--muted); font-weight: 500; }
+    .spec .code { margin: 12px 18px 0; background: #f1f6fb; color: var(--ink);
+                  border: 1px solid var(--line); border-radius: 9px;
+                  padding: 12px 14px; font: .8rem/1.55 var(--mono); overflow-x: auto; }
+    .spec .code .c { color: #8090a2; }
+    .spec .code .k { color: var(--azure); font-weight: 600; }
+    .spec .code .s { color: #1c7a45; }
+    .spec .result { padding: 18px; flex: 1; display: flex; flex-direction: column; gap: 12px; }
+    .takeaway { font-size: .84rem; color: var(--muted); margin: 0; }
+    .takeaway b { color: var(--ink); font-weight: 600; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    button.act {
+        font: 600 .85rem var(--sans); cursor: pointer; border: 1px solid var(--azure);
+        background: var(--paper); color: var(--azure); padding: 7px 13px; border-radius: 8px;
+        transition: background .15s, color .15s;
+    }
+    button.act:hover { background: var(--azure); color: #fff; }
+    button.act.ghost { border-color: var(--line); color: var(--muted); }
+    button.act.ghost:hover { background: var(--muted); color: #fff; border-color: var(--muted); }
+    :focus-visible { outline: 3px solid rgba(0,83,149,.35); outline-offset: 2px; }
+
+    .stage { background: var(--azure-soft); border: 1px dashed rgba(0,83,149,.25);
+             border-radius: 10px; padding: 16px; min-height: 54px;
+             display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .stage.plain { background: #fff; border-style: solid; border-color: var(--line); }
+    .pill { padding: 4px 11px; border-radius: 999px; background: var(--azure); color: #fff; font: .78rem var(--mono); }
+    .swatch { width: 42px; height: 42px; border-radius: 9px; cursor: pointer; transition: transform .15s; }
+    .swatch:hover { transform: translateY(-3px); }
+    .target { padding: 9px 14px; border-radius: 8px; background: #fff; border: 1px solid var(--line); transition: all .25s; }
+    .target.active { background: var(--green); color: #fff; border-color: var(--green); }
+    .status { font: .83rem/1.5 var(--mono); color: var(--muted); }
+    .status b { color: var(--azure); }
+
+    .counter { display: flex; align-items: center; gap: 16px; }
+    .bignum { font: 800 1.9rem var(--mono); color: var(--azure); min-width: 2.5ch; text-align: center; }
+
+    ul.todo { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; width: 100%; }
+    ul.todo li { padding: 8px 12px; background: #fff; border: 1px solid var(--line); border-radius: 8px;
+                 cursor: pointer; font-size: .9rem; transition: all .15s; user-select: none; }
+    ul.todo li:hover { border-color: var(--azure-lt); }
+    ul.todo li.done { color: var(--muted); text-decoration: line-through; background: var(--azure-soft); }
+
+    .cells { display: flex; gap: 6px; flex-wrap: wrap; }
+    .cell { width: 42px; height: 42px; display: grid; place-items: center; cursor: pointer;
+            background: #fff; border: 1px solid var(--line); border-radius: 8px;
+            font: .85rem var(--mono); color: var(--muted); transition: all .15s; user-select: none; }
+    .cell.lit { border-color: var(--azure-lt); background: var(--azure-soft); color: var(--azure); }
+    .cell.sel { background: var(--azure); border-color: var(--azure); color: #fff; font-weight: 700; }
+
+    .dots { display: flex; gap: 9px; flex-wrap: wrap; }
+    .dot { width: 22px; height: 22px; border-radius: 50%; background: var(--line); transition: all .25s; }
+    .dot.on { background: var(--azure); transform: scale(1.25); }
+
+    .bars { display: flex; align-items: flex-end; gap: 9px; height: 110px; width: 100%; }
+    .bar { flex: 1; background: linear-gradient(var(--azure-lt), var(--azure)); border-radius: 5px 5px 0 0;
+           cursor: pointer; transition: height .4s cubic-bezier(.2,.8,.2,1); }
+
+    input.field { font: .9rem var(--mono); padding: 8px 10px; border: 1px solid var(--line);
+                  border-radius: 8px; width: 100%; outline: 0; }
+    input.field:focus { border-color: var(--azure); }
+    .out { font: .8rem/1.5 var(--mono); color: var(--green); background: #f7fafd;
+           border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; word-break: break-all; }
+
+    /* qry.js tooltip — the lib ships mechanics only; this is the page's skin */
+    #qry-tooltip { padding: 8px 12px; background: #fff; border: 1px solid var(--line);
+               border-radius: 9px; box-shadow: 0 8px 24px -8px rgba(12,26,43,.35); }
+    #qry-tooltip-title   { font: 700 13px var(--sans); color: var(--ink); }
+    #qry-tooltip-content { font: 12px var(--mono); color: var(--muted); margin-top: 3px; }
+
+    .install pre { background: #f1f6fb; color: var(--ink); border: 1px solid var(--line); padding: 18px 20px;
+                   border-radius: var(--radius); overflow-x: auto; font: .85rem/1.7 var(--mono); margin: 0 0 16px; }
+    .install pre .c { color: #8090a2; }
+    .install pre .t { color: var(--azure); font-weight: 600; }
+
+    footer { border-top: 1px solid var(--line); background: var(--paper);
+             text-align: center; padding: 36px 24px; color: var(--muted); font-size: .9rem; }
+    footer .wm { font: 800 1.2rem var(--mono); color: var(--ink); }
+    footer .wm .dot { color: var(--azure); }
+
+    @media (prefers-reduced-motion: reduce) {
+        * { transition: none !important; animation: none !important; scroll-behavior: auto; }
+        .spec { opacity: 1; transform: none; }
+    }
+</style>
+</head>
+<body>
+
+<header>
+    <img src="svg/qry-logo.svg" alt="qry.js">
+    <nav>
+        <a href="#try">Try it</a>
+        <a href="#api">Examples</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/Bloechle/qry" target="_blank" rel="noopener">GitHub &rarr;</a>
+    </nav>
+</header>
+
+<section class="hero" id="try">
+    <span class="tag">v1.0.0 &middot; MIT &middot; 0 deps</span>
+    <h1 class="wordmark">qry<span class="dot">.</span><span class="ext">js</span></h1>
+    <p class="pitch">The DOM library where <b>$()</b> returns the <b>real element</b> — no&nbsp;wrapper to unwrap, fully chainable.</p>
+    <p class="sub">No new object model to learn: you work with the element you already know, and qry.js just makes it shorter.</p>
+
+    <div class="repl">
+        <div class="repl-bar">
+            <span class="dotrow"><i></i><i></i><i></i></span>
+            <span class="label">live — edit the chain and press Run (or Enter)</span>
+        </div>
+        <div class="repl-input">
+            <span>$</span>
+            <input id="repl" spellcheck="false" autocomplete="off"
+                   value="('#demo-el').cls('~glow').css('transform','rotate(6deg)')">
+            <button id="repl-run">Run &#9656;</button>
+        </div>
+        <div class="repl-stage">
+            <div class="repl-target-wrap"><div id="demo-el">element</div></div>
+            <div class="repl-console" id="repl-console"><div class="line dim">// click a chip below, or write your own and press Run</div></div>
+        </div>
+    </div>
+    <p class="repl-hint">The console prints the <b>return value</b>. A setter returns the element, so chains keep flowing; a getter returns the value you asked for.</p>
+
+    <div class="chips" id="chips">
+        <span class="lbl">try:</span>
+        <button class="chip" data-q="('#demo-el') instanceof Element">it's a real element</button>
+        <button class="chip" data-q="('#demo-el').cls('+glow').css('background','#1c8c57')">chain two setters</button>
+        <button class="chip" data-q="('#demo-el').text('hello!')">set text</button>
+        <button class="chip" data-q="('#demo-el').attr('data-id','42').data('id')">set, then read back</button>
+        <button class="chip" data-q="('#nope').text('x')">a missing element</button>
+    </div>
+</section>
+
+<div class="stats">
+    <span><b>~600</b> lines</span>
+    <span><b>0</b> dependencies</span>
+    <span><b>1</b> file</span>
+    <span><b>native</b> elements, no wrapper</span>
+    <span><b>MIT</b> licensed</span>
+</div>
+
+<section class="block" id="api">
+    <p class="eyebrow">A guided tour</p>
+    <h2 class="title">One concept per card — code on top, the live result below</h2>
+    <p class="intro">From the basics to traversal and a real chart. Every card is wired with qry.js itself; click to run it.</p>
+
+    <div class="grid" id="grid">
+
+        <!-- 1 · classes -->
+        <div class="spec">
+            <h3><code>.cls()</code> <em>— add / remove / toggle / check</em></h3>
+            <pre class="code"><span class="k">$</span>(<span class="s">'#box'</span>).cls(<span class="s">'~active'</span>)  <span class="c">// + add  - remove  ~ toggle  ? check</span></pre>
+            <div class="result">
+                <div class="controls">
+                    <button class="act" data-cls="+active">+active</button>
+                    <button class="act" data-cls="-active">-active</button>
+                    <button class="act" data-cls="~active">~toggle</button>
+                    <button class="act ghost" id="cls-check">?active</button>
+                </div>
+                <div class="stage"><span id="box" class="target">target</span></div>
+                <p class="takeaway" id="cls-status">One prefixed string does what classList needs four calls for.</p>
+            </div>
+        </div>
+
+        <!-- 2 · content -->
+        <div class="spec">
+            <h3><code>.text()</code> <code>.html()</code> <em>— get or set content</em></h3>
+            <pre class="code"><span class="k">$</span>(<span class="s">'#out'</span>).text(<span class="s">'safe'</span>);  <span class="c">// escaped</span>
+<span class="k">$</span>(<span class="s">'#out'</span>).html(<span class="s">'&lt;b&gt;rich&lt;/b&gt;'</span>);  <span class="c">// parsed</span></pre>
+            <div class="result">
+                <div class="controls">
+                    <button class="act" data-content="text">.text()</button>
+                    <button class="act" data-content="html">.html()</button>
+                    <button class="act ghost" data-content="reset">reset</button>
+                </div>
+                <div class="stage"><span id="out">original content</span></div>
+                <p class="takeaway"><b>.text()</b> escapes, <b>.html()</b> parses — same method shape, get with no argument.</p>
+            </div>
+        </div>
+
+        <!-- 3 · events -->
+        <div class="spec">
+            <h3><code>.on()</code> <em>— listen for events</em></h3>
+            <pre class="code"><span class="k">$</span>(<span class="s">'#inc'</span>).on(<span class="s">'click'</span>, () =&gt; <span class="k">$</span>(<span class="s">'#count'</span>).text(++n));</pre>
+            <div class="result">
+                <div class="counter">
+                    <button class="act ghost" id="dec">−1</button>
+                    <span class="bignum" id="count">0</span>
+                    <button class="act" id="inc">+1</button>
+                </div>
+                <p class="takeaway"><b>.on()</b> is <code>addEventListener</code>, chainable — pass an arrow function, no <code>this</code> surprises.</p>
+            </div>
+        </div>
+
+        <!-- 4 · create + mount -->
+        <div class="spec">
+            <h3><code>$.create()</code> <code>.mount()</code> <em>— build &amp; insert</em></h3>
+            <pre class="code"><span class="k">$</span>.create(<span class="s">'span'</span>, { class: <span class="s">'pill'</span>, text }).mount(<span class="s">'#sink'</span>);</pre>
+            <div class="result">
+                <div class="controls">
+                    <button class="act" id="make">add element</button>
+                    <button class="act ghost" id="make-clear">empty()</button>
+                </div>
+                <div class="stage" id="sink"></div>
+                <p class="takeaway">Create with props in one call, then <b>.mount()</b> it into any target.</p>
+            </div>
+        </div>
+
+        <!-- 5 · delegation -->
+        <div class="spec">
+            <h3><code>.delegate()</code> <em>— one listener for many items</em></h3>
+            <pre class="code"><span class="k">$</span>(<span class="s">'#list'</span>).delegate(<span class="s">'li'</span>, <span class="s">'click'</span>, <span class="k">function</span> () {
+  <span class="k">this</span>.cls(<span class="s">'~done'</span>);  <span class="c">// `this` = the clicked &lt;li&gt;</span>
+});</pre>
+            <div class="result">
+                <ul class="todo" id="list">
+                    <li>click me</li><li>then me</li><li>toggle done</li>
+                </ul>
+                <div class="controls"><button class="act ghost" id="add-li">+ add item</button></div>
+                <p class="takeaway">New items work instantly — the listener lives on the parent, not each child.</p>
+            </div>
+        </div>
+
+        <!-- 6 · traversal -->
+        <div class="spec">
+            <h3>Traversal <em>— move around the DOM</em></h3>
+            <pre class="code">cell.prev()  cell.next()  cell.idx()  <span class="c">// neighbours &amp; position</span></pre>
+            <div class="result">
+                <div class="cells" id="cells"></div>
+                <p class="takeaway status" id="trav-status">Click a cell — its neighbours light up via <b>.prev()</b> / <b>.next()</b>.</p>
+            </div>
+        </div>
+
+        <!-- 7 · collections are real arrays -->
+        <div class="spec">
+            <h3><code>$.all()</code> <em>— a real Array, not a wrapper</em></h3>
+            <pre class="code"><span class="k">$</span>.all(<span class="s">'.dot'</span>).forEach((d, i) =&gt; …)  <span class="c">// native .forEach / .map / .filter</span></pre>
+            <div class="result">
+                <div class="dots" id="dots"></div>
+                <div class="controls"><button class="act" id="run-coll">stagger them</button></div>
+                <p class="takeaway">No special collection API to learn — it's a plain Array, so array methods just work.</p>
+            </div>
+        </div>
+
+        <!-- 8 · tooltip -->
+        <div class="spec">
+            <h3><code>$.tip()</code> <em>— shared tooltip, follows the cursor</em></h3>
+            <pre class="code"><span class="k">$</span>.tip(swatch, name, hex);</pre>
+            <div class="result">
+                <div class="stage plain" id="swatches"></div>
+                <p class="takeaway">One call binds enter / move / leave. Hover the swatches.</p>
+            </div>
+        </div>
+
+        <!-- 9 · scale / chart -->
+        <div class="spec">
+            <h3><code>$.scale()</code> <em>— map a value to a range</em></h3>
+            <pre class="code"><span class="k">$</span>.scale(v, 0, max, 8, 110)  <span class="c">// value → bar height (px)</span></pre>
+            <div class="result">
+                <div class="stage plain"><div class="bars" id="bars"></div></div>
+                <div class="controls"><button class="act" id="reshuffle">shuffle data</button></div>
+                <p class="takeaway">The one math helper a chart needs — bars built from plain elements, each with a <b>$.tip</b>.</p>
+            </div>
+        </div>
+
+        <!-- 10 · forms -->
+        <div class="spec">
+            <h3><code>.val()</code> <code>.serialize()</code> <em>— read a form</em></h3>
+            <pre class="code"><span class="k">$</span>(<span class="s">'#form'</span>).serialize().toString()  <span class="c">// → URLSearchParams</span></pre>
+            <div class="result">
+                <form id="form" style="display:flex; flex-direction:column; gap:8px;">
+                    <input class="field" name="name" value="Ada" aria-label="name">
+                    <input class="field" name="city" value="Fribourg" aria-label="city">
+                </form>
+                <div class="controls"><button class="act" id="ser">serialize()</button></div>
+                <div class="out" id="ser-out">name=Ada&amp;city=Fribourg</div>
+            </div>
+        </div>
+
+        <!-- 11 · null-safe -->
+        <div class="spec">
+            <h3>Null-safe <em>— a miss never throws</em></h3>
+            <pre class="code"><span class="k">$</span>(<span class="s">'#ghost'</span>).text(<span class="s">'x'</span>);  <span class="c">// warns, returns a node, no crash</span></pre>
+            <div class="result">
+                <div class="controls"><button class="act" id="nullsafe">look up a missing id</button></div>
+                <p class="takeaway status" id="nullsafe-status">Open the console, then click.</p>
+            </div>
+        </div>
+
+    </div>
+</section>
+
+<section class="block install" id="install">
+    <p class="eyebrow">Install</p>
+    <h2 class="title">Drop in one file. Start writing <code>$</code>.</h2>
+    <p class="intro">qry.js defines the global <code>$</code> — a classic script, no bundler, no <code>import</code>.</p>
+    <pre><span class="c">&lt;!-- local --&gt;</span>
+&lt;<span class="t">script</span> src=<span style="color:#1c7a45">"qry.js"</span>&gt;&lt;/<span class="t">script</span>&gt;
+
+<span class="c">&lt;!-- pinned to a release (recommended) --&gt;</span>
+&lt;<span class="t">script</span> src=<span style="color:#1c7a45">"https://cdn.jsdelivr.net/gh/Bloechle/qry@1.0.0/qry.js"</span>&gt;&lt;/<span class="t">script</span>&gt;</pre>
+    <p class="intro" style="margin-bottom:0">Then anywhere: <code>$('#app').cls('+ready')</code>. Full API in the
+        <a href="https://github.com/Bloechle/qry#readme">README</a>.</p>
+</section>
+
+<footer>
+    <div class="wm">qry<span class="dot">.</span>js</div>
+    <p>MIT © Jean-Luc Bloechle · <a href="https://github.com/Bloechle/qry">github.com/Bloechle/qry</a></p>
+</footer>
+
+<script src="qry.js"></script>
+<script>
+$.ready(() => {
+
+    /* ---- hero REPL ---- */
+    const consoleEl = $('#repl-console');
+    const describe = (r) => {
+        if (r instanceof Element) {
+            const c = r.className ? '.' + r.className.trim().split(/\s+/).join('.') : '';
+            return `<${r.tagName.toLowerCase()}${c}>   // a real Element — chain continues`;
+        }
+        return typeof r === 'string' ? JSON.stringify(r) : String(r);
+    };
+    const run = (expr) => {
+        try {
+            const result = new Function('$', '"use strict"; return ($' + expr + ');')($);
+            consoleEl.empty().add($.create('div', { class: 'line ret', text: '$' + expr + '\n→ ' + describe(result) }));
+        } catch (e) {
+            consoleEl.empty().add($.create('div', { class: 'line err', text: '$' + expr + '\n✗ ' + e.message }));
+        }
+    };
+    $('#repl-run').on('click', () => run($('#repl').val()));
+    $('#repl').on('keydown', (e) => { if (e.key === 'Enter') run($('#repl').val()); });
+    $.all('#chips .chip').forEach(chip =>
+        chip.on('click', () => { $('#repl').val(chip.data('q')); run(chip.data('q')); }));
+
+    /* ---- classes ---- */
+    $.all('[data-cls]').forEach(btn => btn.on('click', () => $('#box').cls(btn.data('cls'))));
+    $('#cls-check').on('click', () =>
+        $('#cls-status').html(`<code>cls('?active')</code> → <b>${$('#box').cls('?active')}</b>`));
+
+    /* ---- content ---- */
+    $.all('[data-content]').forEach(btn => btn.on('click', () => {
+        const m = btn.data('content');
+        if (m === 'text')  $('#out').text('plain text, < & > escaped');
+        if (m === 'html')  $('#out').html('<b>bold</b> parsed as HTML');
+        if (m === 'reset') $('#out').text('original content');
+    }));
+
+    /* ---- events: counter ---- */
+    let n = 0;
+    $('#inc').on('click', () => $('#count').text(++n));
+    $('#dec').on('click', () => $('#count').text(--n));
+
+    /* ---- create + mount ---- */
+    let made = 0;
+    $('#make').on('click', () => $.create('span', { class: 'pill', text: `item ${++made}` }).mount('#sink'));
+    $('#make-clear').on('click', () => { $('#sink').empty(); made = 0; });
+
+    /* ---- delegation ---- */
+    $('#list').delegate('li', 'click', function () { this.cls('~done'); });
+    let li = 3;
+    $('#add-li').on('click', () => $.create('li', { text: `item ${++li}` }).mount('#list'));
+
+    /* ---- traversal ---- */
+    for (let i = 1; i <= 7; i++) $.create('div', { class: 'cell', text: i }).mount('#cells');
+    $('#cells').delegate('.cell', 'click', function () {
+        $.all('#cells .cell').forEach(c => c.cls('-sel -lit'));
+        this.cls('+sel');
+        const prev = this.prev(), next = this.next();   // native siblings — may be null at the edges
+        if (prev) prev.cls('+lit');
+        if (next) next.cls('+lit');
+        $('#trav-status').html(`<b>.idx()</b> = ${this.idx()} · neighbours lit via <b>.prev()</b> / <b>.next()</b>`);
+    });
+
+    /* ---- collections are real arrays ---- */
+    for (let i = 0; i < 12; i++) $.create('div', { class: 'dot' }).mount('#dots');
+    $('#run-coll').on('click', () =>
+        $.all('#dots .dot').forEach((d, i) => setTimeout(() => d.cls('~on'), i * 55)));
+
+    /* ---- tooltip swatches ---- */
+    [['Azure', '#005395'], ['Pine', '#1c8c57'], ['Amber', '#c0851e'], ['Brick', '#b0413f'], ['Slate', '#5d6e7e']]
+        .forEach(([name, hex]) => {
+            const sw = $.create('div', { class: 'swatch' }).css('background', hex).mount('#swatches');
+            $.tip(sw, name, hex);
+        });
+
+    /* ---- scale: bar chart ---- */
+    const draw = () => {
+        const data = Array.from({ length: 8 }, () => Math.round(Math.random() * 95) + 5);
+        const max = Math.max(...data);
+        $('#bars').empty();
+        data.forEach(v => {
+            const h = $.scale(v, 0, max, 8, 110);
+            const bar = $.create('div', { class: 'bar' }).css('height', '0px').mount('#bars');
+            $.tip(bar, `value ${v}`, `${h.toFixed(0)} px tall`);
+            requestAnimationFrame(() => bar.css('height', `${h}px`));
+        });
+    };
+    $('#reshuffle').on('click', draw);
+    draw();
+
+    /* ---- forms ---- */
+    $('#ser').on('click', () => $('#ser-out').text($('#form').serialize().toString() || '(empty)'));
+
+    /* ---- null-safe ---- */
+    $('#nullsafe').on('click', () => {
+        const ghost = $('#ghost');             // warns, returns a <qry-nil>
+        ghost.text('written to nowhere');       // chain survives
+        $('#nullsafe-status').html(`returned <b>&lt;${ghost.tagName.toLowerCase()}&gt;</b> — chain survived, no crash (see console)`);
+    });
+
+    /* ---- reveal cards on scroll ---- */
+    if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver((es) => {
+            es.forEach(e => { if (e.isIntersecting) { e.target.cls('+in'); io.unobserve(e.target); } });
+        }, { threshold: 0.12 });
+        $.all('.spec').forEach(s => io.observe(s));
+    } else {
+        $.all('.spec').forEach(s => s.cls('+in'));
+    }
+
+});
+</script>
+</body>
+</html>

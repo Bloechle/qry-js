@@ -1,0 +1,49 @@
+{
+  "name": "qry-js",
+  "version": "1.0.0",
+  "description": "Ultra-light, prototype-based DOM library. $() returns native elements — no wrapper, fully chainable.",
+  "main": "qry.js",
+  "type": "commonjs",
+  "files": [
+    "qry.js",
+    "qry-kit.js",
+    "qry-ui.css",
+    "qry-devtools.js",
+    "qry-bridge.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Bloechle/qry.git"
+  },
+  "keywords": [
+    "dom",
+    "query",
+    "selector",
+    "vanilla",
+    "lightweight",
+    "prototype",
+    "native-elements",
+    "jquery-alternative",
+    "svg",
+    "dataviz",
+    "browser",
+    "frontend",
+    "es6",
+    "minimal"
+  ],
+  "author": "Jean-Luc Bloechle",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Bloechle/qry/issues"
+  },
+  "homepage": "https://github.com/Bloechle/qry#readme",
+  "browserslist": [
+    "defaults",
+    "not ie 11",
+    "not op_mini all"
+  ],
+  "jsdelivr": "qry.js",
+  "unpkg": "qry.js"
+}
