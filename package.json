@@ -15,7 +15,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Bloechle/qry.git"
+    "url": "git+https://github.com/Bloechle/qry-js.git"
   },
   "keywords": [
     "dom",
@@ -36,9 +36,9 @@
   "author": "Jean-Luc Bloechle",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/Bloechle/qry/issues"
+    "url": "https://github.com/Bloechle/qry-js/issues"
   },
-  "homepage": "https://github.com/Bloechle/qry#readme",
+  "homepage": "https://github.com/Bloechle/qry-js#readme",
   "browserslist": [
     "defaults",
     "not ie 11",

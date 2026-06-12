@@ -6,7 +6,7 @@
   <p><strong>Ultra-light, prototype-based DOM library.</strong><br>
   <code>$()</code> returns native elements — no wrapper, fully chainable, zero dependencies.</p>
 
-  <p><a href="https://bloechle.github.io/qry/"><strong>Live demo →</strong></a></p>
+  <p><a href="https://bloechle.github.io/qry-js/"><strong>Live demo →</strong></a></p>
 </div>
 
 ---
@@ -42,10 +42,10 @@ Via CDN (jsDelivr, from GitHub):
 
 ```html
 <!-- pinned to a release (recommended) -->
-<script src="https://cdn.jsdelivr.net/gh/Bloechle/qry@1.1.0/qry.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.1.0/qry.js"></script>
 
 <!-- or always the latest -->
-<script src="https://cdn.jsdelivr.net/gh/Bloechle/qry@latest/qry.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@latest/qry.js"></script>
 ```
 
 > qry.js is a classic script that defines `window.$`, **not** an ES module — there is no `import`. This is deliberate: drop the file in and start writing `$(...)`.
@@ -202,11 +202,11 @@ The tooltip ships **mechanics only** (position, fade, never eats the mouse) and 
 
 | File | Role | CDN |
 |---|---|---|
-| `qry.js` | DOM core — the global `$` | `gh/Bloechle/qry@1.1.0/qry.js` |
-| `qry-ui.css` | App shell + design tokens (light/dark, built on Shoelace) | `gh/Bloechle/qry@1.1.0/qry-ui.css` |
-| `qry-kit.js` | Glue: theme, toast, files, keyboard, iframe embed, boot… | `gh/Bloechle/qry@1.1.0/qry-kit.js` |
-| `qry-devtools.js` | Optional in-page console + element inspector | `gh/Bloechle/qry@1.1.0/qry-devtools.js` |
-| `qry-bridge.js` | Optional cross-page shared store over a hidden iframe | `gh/Bloechle/qry@1.1.0/qry-bridge.js` |
+| `qry.js` | DOM core — the global `$` | `gh/Bloechle/qry-js@1.1.0/qry.js` |
+| `qry-ui.css` | App shell + design tokens (light/dark, built on Shoelace) | `gh/Bloechle/qry-js@1.1.0/qry-ui.css` |
+| `qry-kit.js` | Glue: theme, toast, files, keyboard, iframe embed, boot… | `gh/Bloechle/qry-js@1.1.0/qry-kit.js` |
+| `qry-devtools.js` | Optional in-page console + element inspector | `gh/Bloechle/qry-js@1.1.0/qry-devtools.js` |
+| `qry-bridge.js` | Optional cross-page shared store over a hidden iframe | `gh/Bloechle/qry-js@1.1.0/qry-bridge.js` |
 
 Pair it with [Shoelace](https://shoelace.style) for widgets and
 [Lucide](https://lucide.dev) for icons. No build step — everything is served
@@ -221,20 +221,20 @@ from GitHub via jsDelivr, pinned to a release.
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
 
 <!-- qry-ui.css (shell) + Lucide (icons) + qry.js core -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Bloechle/qry@1.1.0/qry-ui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.1.0/qry-ui.css">
 <script src="https://cdn.jsdelivr.net/npm/lucide@1.17.0/dist/umd/lucide.min.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/Bloechle/qry@1.1.0/qry.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.1.0/qry.js"></script>
 
 <script type="module">
-    import { boot, theme, toast } from 'https://cdn.jsdelivr.net/gh/Bloechle/qry@1.1.0/qry-kit.js';
+    import { boot, theme, toast } from 'https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.1.0/qry-kit.js';
     boot({ title: 'My app', ready: () => toast('Ready', 'success') });
 </script>
 ```
 
 **Examples** ([source](./examples)):
 
-- **[Live demo →](https://bloechle.github.io/qry/examples/qry-demo.html)** — a running showcase of every helper.
-- **[Template →](https://bloechle.github.io/qry/examples/qry-template.html)** — a copy-and-go starter for a new app.
+- **[Live demo →](https://bloechle.github.io/qry-js/examples/qry-demo.html)** — a running showcase of every helper.
+- **[Template →](https://bloechle.github.io/qry-js/examples/qry-template.html)** — a copy-and-go starter for a new app.
 
 ### qry-kit.js
 
