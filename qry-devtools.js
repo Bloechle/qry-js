@@ -18,7 +18,7 @@
  *
  * Requires qry.js loaded first (global `$`).
  *
- * @version 1.0.0
+ * @version 1.1.0
  * @author  Jean-Luc Bloechle with Claude.ai
  * @license MIT
  */
