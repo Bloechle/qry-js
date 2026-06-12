@@ -29,7 +29,7 @@
  *
  * Values must be JSON-safe (they live in localStorage). Requires qry.js (global `$`).
  *
- * @version 1.0.0
+ * @version 1.1.0
  * @author  Jean-Luc Bloechle with Claude.ai
  * @license MIT
  */
@@ -37,9 +37,15 @@
 const _TYPE = 'qry:bridge';                 // every message carries this namespace
 
 // dot-path helpers (shared by both halves) ───────────────────────────────────
+// Paths containing __proto__ / prototype / constructor are rejected outright
+// (reads return undefined, writes/deletes are no-ops) so a caller can't
+// pollute Object.prototype inside the host realm through a crafted path.
+const _unsafe = path => path.split('.').some(k => k === '__proto__' || k === 'prototype' || k === 'constructor');
 const _get = (obj, path) =>
-    !path ? obj : path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
+    !path ? obj : _unsafe(path) ? undefined
+        : path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
 const _set = (obj, path, value) => {
+    if (_unsafe(path)) return;
     const parts = path.split('.');
     let cur = obj;
     for (let i = 0; i < parts.length - 1; i++) {
@@ -50,6 +56,7 @@ const _set = (obj, path, value) => {
     cur[parts[parts.length - 1]] = value;
 };
 const _del = (obj, path) => {
+    if (_unsafe(path)) return;
     const parts = path.split('.');
     let cur = obj;
     for (let i = 0; i < parts.length - 1; i++) { cur = cur[parts[i]]; if (cur == null) return; }

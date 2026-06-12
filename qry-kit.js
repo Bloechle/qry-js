@@ -41,7 +41,7 @@
  * Requires qry.js loaded first as a <script> (provides window.$). Functions that
  * build widgets (toast, confirm, prompt) require Shoelace's autoloader.
  *
- * @version 1.0.0
+ * @version 1.1.0
  * @author  Jean-Luc Bloechle with Claude.ai
  * @license MIT
  */
@@ -182,13 +182,17 @@ export const str = {
     stripBom(text) {
         return text && text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
     },
-    /** `"Hello World!"` → `"helloWorld"`. Strips non-alphanumerics, camelCases.
+    /** `"Hello World!"` → `"helloWorld"`, `"font-size"` → `"fontSize"`,
+     *  `"reaction_time_ms"` → `"reactionTimeMs"`. Hyphens/underscores count as
+     *  word boundaries; other non-alphanumerics are stripped.
      *  @param {string} s @returns {string} */
     camelCase(s) {
         return String(s)
             .trim()
+            .replace(/[-_]+/g, ' ')
             .replace(/[^a-zA-Z0-9 ]/g, '')
             .split(/\s+/)
+            .filter(Boolean)
             .map((w, i) => i === 0
                 ? w.toLowerCase()
                 : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
@@ -213,9 +217,11 @@ const _themeStore = makeStore('qry_');
 
 // ─── 5. Theme & icons — one switch drives qry-ui.css + Shoelace ──────────────
 
-/** Light/dark theme, persisted, driving BOTH layers at once:
- *  - `data-theme` on <html>          → qry-ui.css tokens
- *  - `sl-theme-dark` class on <html> → all Shoelace widgets
+/** Light/dark theme, persisted, applied via two hooks on <html>:
+ *  - `sl-theme-dark` class → drives BOTH the qry-ui.css tokens and all
+ *    Shoelace widgets (qry-ui.css keys its dark tokens off this class)
+ *  - `data-theme="light|dark"` attribute → not used by the stack itself;
+ *    kept as a stable hook for app-specific CSS
  *
  *  @example
  *  theme.init();              // apply saved (or system) preference on boot
@@ -506,6 +512,14 @@ export const prompt = (message, { label = 'Input', value = '', placeholder = '',
  *  Mobile (≤ breakpoint): `.open` slides the sidebar in; overlay click closes.
  *  Desktop (> breakpoint): `.collapsed` shrinks it to icon-only width.
  *
+ *  Markup contract: the mobile slide-in needs the sidebar to ALSO carry the
+ *  `mobile` class (qry-ui.css keys off `.qry-sidebar.mobile.open`; without it
+ *  toggling is a no-op on small screens), plus a backdrop element matching
+ *  `opts.overlay` styled by `.qry-overlay`:
+ *      <aside class="qry-sidebar mobile">…</aside>
+ *      <div id="qry-overlay" class="qry-overlay"></div>
+ *  Desktop collapse needs no extra markup.
+ *
  *  All selectors are optional — missing elements are skipped, not fatal.
  *  @param {string} sidebarSel
  *  @param {Object} [opts] @param {string} [opts.collapseBtn='#qry-collapse'] @param {string} [opts.overlay='#qry-overlay'] @param {number} [opts.breakpoint=768]
@@ -592,7 +606,8 @@ export const makeAutoHideHeader = ({
  *  and returns an unregister function; `destroy()` removes everything. Matching
  *  is case-insensitive; a `ctrl` binding fires only with Ctrl/⌘ held, a plain
  *  binding only without. Shortcuts are skipped while focus is in an INPUT,
- *  TEXTAREA, or [contenteditable].
+ *  TEXTAREA, SELECT, [contenteditable] — or a Shoelace form field (events from
+ *  inside a shadow root retarget to the host, so the SL-* host tag is checked).
  *  @returns {{ on:(key:string, fn:Function, opts?:{ctrl?:boolean,prevent?:boolean})=>(()=>void), destroy:()=>void }}
  *  @example
  *  const keys = makeKeyboard();
@@ -602,9 +617,10 @@ export const makeAutoHideHeader = ({
  */
 export const makeKeyboard = () => {
     const handlers = [];
+    const _typing = /^(INPUT|TEXTAREA|SELECT|SL-INPUT|SL-TEXTAREA|SL-SELECT|SL-COLOR-PICKER)$/;
     const onKey = e => {
         const t = e.target;
-        if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return;
+        if (_typing.test(t.tagName) || t.isContentEditable) return;
         const ctrl = e.ctrlKey || e.metaKey;
         for (const h of handlers) {
             if (e.key.toLowerCase() !== h.key.toLowerCase()) continue;
@@ -742,7 +758,7 @@ const _IFRAME_MSG = 'qry:iframe-height';
  *  @param {string} [opts.origin='*']      target origin for postMessage (set it in prod)
  *  @param {number} [opts.min=20]          min px change before re-posting
  *  @param {number} [opts.debounce=250]    resize/mutation debounce (ms)
- *  @returns {{ send: () => void, destroy: () => void }}
+ *  @returns {{ send: () => void, post: (type: string, data?: Object) => void, destroy: () => void }}
  *  @example makeIframeAutoHeight({ origin: 'https://host.example' })
  */
 export const makeIframeAutoHeight = ({ sentinel = 'qry-iframe-sentinel', origin = '*', min = 20, debounce: ms = 250 } = {}) => {

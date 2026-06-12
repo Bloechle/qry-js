@@ -6,7 +6,7 @@
  *
  * KISS · DRY · Zero dependencies · No ES module
  *
- * @version 1.0.0
+ * @version 1.1.0
  * @author Jean-Luc Bloechle with Claude.ai
  * @license MIT
  */
@@ -437,6 +437,33 @@ Element.prototype.offset = function () {
     const r = this.getBoundingClientRect();
     return { top: r.top + scrollY, left: r.left + scrollX };
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 12b. LEGACY SHADOW FIXES
+// ═══════════════════════════════════════════════════════════════════════════
+
+/* A few specific prototypes carry legacy members that shadow the qry methods
+ * defined on Element.prototype, making them silently unavailable there
+ * (e.g. `$('a').text('Hi')` would throw — HTMLAnchorElement.text is a legacy
+ * string accessor). Re-assert the qry method where the native member is a
+ * vestigial alias nobody should rely on:
+ *   .text  on <a>, <option>, <script>   (legacy aliases of textContent)
+ *   .data  on <object>                  (legacy reflection of the data attr)
+ *   .add   on <select>                  (native add(option, before) — the qry
+ *                                        add(el|html) covers the common case)
+ * Deliberately NOT touched: width/height on <img>/<canvas>/<video>/<iframe>/
+ * <embed>/<object>/<td> — `canvas.width = …` must keep resizing the bitmap.
+ * Use el.css('width') / getBoundingClientRect() there. Likewise <dialog>
+ * keeps its native show(). defineProperty is required: plain assignment would
+ * trip the legacy accessor's setter instead of replacing it. */
+{
+    const P = Element.prototype;
+    const fix = (proto, name) =>
+        Object.defineProperty(proto, name, { value: P[name], writable: true, configurable: true });
+    [HTMLAnchorElement, HTMLOptionElement, HTMLScriptElement].forEach(C => fix(C.prototype, 'text'));
+    fix(HTMLObjectElement.prototype, 'data');
+    fix(HTMLSelectElement.prototype, 'add');
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 13. SCALE

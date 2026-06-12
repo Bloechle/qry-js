@@ -63,13 +63,15 @@
         #to-top.visible { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
         #to-top:hover { background: var(--qry-blue-600); }
         #to-top i, #to-top svg { width: 1.2rem; height: 1.2rem; }
+        #qry-menu { margin-right: 0.4rem; }
+        @media (max-width: 768px) { #qry-menu { display: inline-flex !important; } }
     </style>
 </head>
 
 <body class="qry-app">
 
 <header class="qry-header fixed">
-    <h1><i data-lucide="zap"></i> qry-kit <span class="qry-mono" style="font-size:0.7rem;opacity:0.6">v1.0.0</span></h1>
+    <h1><button id="qry-menu" class="qry-btn" aria-label="Menu" style="display:none"><i data-lucide="menu"></i></button><i data-lucide="zap"></i> qry-kit <span class="qry-mono" style="font-size:0.7rem;opacity:0.6">v1.1.0</span></h1>
     <div style="display:flex;gap:0.25rem;align-items:center">
         <button id="btn-theme" class="qry-btn" aria-label="Toggle theme"><i data-lucide="moon"></i></button>
         <a class="qry-btn" href="https://github.com/Bloechle/qry" target="_blank" rel="noopener" aria-label="GitHub"><svg viewBox="0 0 24 24" width="1.1rem" height="1.1rem" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-1.7c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg></a>
@@ -78,7 +80,7 @@
 
 <div class="qry-dashboard">
 
-    <aside class="qry-sidebar" id="sidebar">
+    <aside class="qry-sidebar mobile" id="sidebar">
         <div class="qry-sidebar-body">
             <nav class="qry-sidebar-nav">
                 <div class="qry-sidebar-label">Modules</div>
@@ -99,6 +101,7 @@
             </a>
         </div>
     </aside>
+    <div id="qry-overlay" class="qry-overlay"></div>
 
     <main class="qry-content">
 
@@ -302,7 +305,8 @@
             wire();
             makeAutoHideHeader();        // header retracts on scroll-down
             // makeSidebar — present so its API is exercised even on desktop
-            makeSidebar('#sidebar');
+            const nav = makeSidebar('#sidebar');
+            $('#qry-menu').on('click', () => nav.toggle());
             // makeDropZone — drop files anywhere; readFiles parses them
             makeDropZone(document.body, { label: 'Drop .json or .zip', onFiles: loadFiles });
             setupScroll();

@@ -42,7 +42,7 @@ Via CDN (jsDelivr, from GitHub):
 
 ```html
 <!-- pinned to a release (recommended) -->
-<script src="https://cdn.jsdelivr.net/gh/Bloechle/qry@1.0.0/qry.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/Bloechle/qry@1.1.0/qry.js"></script>
 
 <!-- or always the latest -->
 <script src="https://cdn.jsdelivr.net/gh/Bloechle/qry@latest/qry.js"></script>
@@ -117,7 +117,8 @@ el.css('color')                            // computed value
 el.css('color', 'red')
 el.css({ color: 'red', fontSize: '2em' })
 el.width()   el.width(320)                 // measure px (border-box) / set CSS width
-el.height()  el.height(200)
+el.height()  el.height(200)                //   (on img/canvas/video/iframe the native
+                                           //    accessors win — use css('width') there)
 el.show()   el.hide()
 ```
 
@@ -201,11 +202,11 @@ The tooltip ships **mechanics only** (position, fade, never eats the mouse) and 
 
 | File | Role | CDN |
 |---|---|---|
-| `qry.js` | DOM core — the global `$` | `gh/Bloechle/qry@1.0.0/qry.js` |
-| `qry-ui.css` | App shell + design tokens (light/dark, built on Shoelace) | `gh/Bloechle/qry@1.0.0/qry-ui.css` |
-| `qry-kit.js` | Glue: theme, toast, files, keyboard, iframe embed, boot… | `gh/Bloechle/qry@1.0.0/qry-kit.js` |
-| `qry-devtools.js` | Optional in-page console + element inspector | `gh/Bloechle/qry@1.0.0/qry-devtools.js` |
-| `qry-bridge.js` | Optional cross-page shared store over a hidden iframe | `gh/Bloechle/qry@1.0.0/qry-bridge.js` |
+| `qry.js` | DOM core — the global `$` | `gh/Bloechle/qry@1.1.0/qry.js` |
+| `qry-ui.css` | App shell + design tokens (light/dark, built on Shoelace) | `gh/Bloechle/qry@1.1.0/qry-ui.css` |
+| `qry-kit.js` | Glue: theme, toast, files, keyboard, iframe embed, boot… | `gh/Bloechle/qry@1.1.0/qry-kit.js` |
+| `qry-devtools.js` | Optional in-page console + element inspector | `gh/Bloechle/qry@1.1.0/qry-devtools.js` |
+| `qry-bridge.js` | Optional cross-page shared store over a hidden iframe | `gh/Bloechle/qry@1.1.0/qry-bridge.js` |
 
 Pair it with [Shoelace](https://shoelace.style) for widgets and
 [Lucide](https://lucide.dev) for icons. No build step — everything is served
@@ -220,12 +221,12 @@ from GitHub via jsDelivr, pinned to a release.
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
 
 <!-- qry-ui.css (shell) + Lucide (icons) + qry.js core -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Bloechle/qry@1.0.0/qry-ui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Bloechle/qry@1.1.0/qry-ui.css">
 <script src="https://cdn.jsdelivr.net/npm/lucide@1.17.0/dist/umd/lucide.min.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/Bloechle/qry@1.0.0/qry.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/Bloechle/qry@1.1.0/qry.js"></script>
 
 <script type="module">
-    import { boot, theme, toast } from 'https://cdn.jsdelivr.net/gh/Bloechle/qry@1.0.0/qry-kit.js';
+    import { boot, theme, toast } from 'https://cdn.jsdelivr.net/gh/Bloechle/qry@1.1.0/qry-kit.js';
     boot({ title: 'My app', ready: () => toast('Ready', 'success') });
 </script>
 ```
@@ -271,7 +272,7 @@ runs inside the iframe, `makeBridge` in each page (`get`/`set`/`del`/`keys` +
 
 qry.js **extends native prototypes** (`Element`, `EventTarget`) on purpose. That is what keeps `$()` transparent: there is no wrapper to step around. The well-known caution against extending built-ins comes from libraries shipped to coexist with arbitrary third-party code on the open web (the MooTools `Array.prototype.flatten` / `flat` collision is the canonical case). qry.js is built for environments you control — your own pages and projects — where that failure mode does not apply and a collision, should the platform ever add a same-named method, is a one-line rename away.
 
-The library is almost entirely **additive**. The one native method it overrides is `Element.prototype.remove()`, returned chainable (`this`) instead of `undefined`; behaviour is otherwise identical to the native method, so existing `el.remove()` calls are unaffected.
+The library is almost entirely **additive**. Two native members are deliberately overridden: `Element.prototype.remove()`, returned chainable (`this`) instead of `undefined` with otherwise identical behaviour, and `HTMLSelectElement.prototype.add()`, replaced by the qry `add(el|html)` so the API stays uniform (the rarely-used native two-argument `add(option, before)` form is dropped). A few vestigial legacy accessors that would otherwise *shadow* qry methods are also re-pointed at them: `.text` on `<a>`/`<option>`/`<script>` and `.data` on `<object>` — so `$('a').text('Hi')` works everywhere. One boundary remains by design: on `<img>`, `<canvas>`, `<video>`, `<iframe>`, `<embed>`, `<object>` and `<td>`, the native `width`/`height` accessors are kept (`canvas.width = 500` must keep resizing the bitmap), so use `el.css('width')` or `getBoundingClientRect()` there instead of qry's `.width()`/`.height()`.
 
 A selector that matches nothing returns a fresh detached `<qry-nil>` element and logs a warning naming the selector — your chain keeps running instead of throwing, and two failed lookups never share state.
 
