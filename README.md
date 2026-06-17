@@ -42,7 +42,7 @@ Via CDN (jsDelivr, from GitHub):
 
 ```html
 <!-- pinned to a release (recommended) -->
-<script src="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.2.0/qry.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.3.0/qry.js"></script>
 
 <!-- or always the latest -->
 <script src="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@latest/qry.js"></script>
@@ -202,11 +202,11 @@ The tooltip ships **mechanics only** (position, fade, never eats the mouse) and 
 
 | File | Role | CDN |
 |---|---|---|
-| `qry.js` | DOM core — the global `$` | `gh/Bloechle/qry-js@1.2.0/qry.js` |
-| `qry-ui.css` | App shell + design tokens (light/dark, built on Shoelace) | `gh/Bloechle/qry-js@1.2.0/qry-ui.css` |
-| `qry-kit.js` | Glue: theme, toast, files, keyboard, iframe embed, boot… | `gh/Bloechle/qry-js@1.2.0/qry-kit.js` |
-| `qry-devtools.js` | Optional in-page console + element inspector | `gh/Bloechle/qry-js@1.2.0/qry-devtools.js` |
-| `qry-bridge.js` | Optional cross-page shared store over a hidden iframe | `gh/Bloechle/qry-js@1.2.0/qry-bridge.js` |
+| `qry.js` | DOM core — the global `$` | `gh/Bloechle/qry-js@1.3.0/qry.js` |
+| `qry-ui.css` | App shell + design tokens (light/dark, built on Shoelace) | `gh/Bloechle/qry-js@1.3.0/qry-ui.css` |
+| `qry-kit.js` | Glue: theme, toast, files, keyboard, iframe embed, boot… | `gh/Bloechle/qry-js@1.3.0/qry-kit.js` |
+| `qry-devtools.js` | Optional in-page console + element inspector | `gh/Bloechle/qry-js@1.3.0/qry-devtools.js` |
+| `qry-bridge.js` | Optional cross-page shared store over a hidden iframe | `gh/Bloechle/qry-js@1.3.0/qry-bridge.js` |
 
 Pair it with [Shoelace](https://shoelace.style) for widgets and
 [Lucide](https://lucide.dev) for icons. No build step — everything is served
@@ -221,12 +221,12 @@ from GitHub via jsDelivr, pinned to a release.
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
 
 <!-- qry-ui.css (shell) + Lucide (icons) + qry.js core -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.2.0/qry-ui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.3.0/qry-ui.css">
 <script src="https://cdn.jsdelivr.net/npm/lucide@1.17.0/dist/umd/lucide.min.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.2.0/qry.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.3.0/qry.js"></script>
 
 <script type="module">
-    import { boot, theme, toast } from 'https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.2.0/qry-kit.js';
+    import { boot, theme, toast } from 'https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.3.0/qry-kit.js';
     boot({ title: 'My app', ready: () => toast('Ready', 'success') });
 </script>
 ```

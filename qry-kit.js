@@ -45,7 +45,7 @@
  * Requires qry.js loaded first as a <script> (provides window.$). Functions that
  * build widgets (toast, confirm, prompt) require Shoelace's autoloader.
  *
- * @version 1.2.0
+ * @version 1.3.0
  * @author  Jean-Luc Bloechle with Claude.ai
  * @license MIT
  */
@@ -609,68 +609,95 @@ export const makeAutoHideHeader = ({
  *  native style API on the container. Pairs with the qry-ui.css `.qry-split`
  *  handle and the `.qry-workspace` shell (whose aside reads `--qry-aside-w`),
  *  but works on any container/variable you point it at.
+ *
+ *  Live updates flow through `onResize` (every move); commit-once work belongs in
+ *  `onEnd` (pointer-up) — e.g. re-rasterize a viewer only when the drag settles.
+ *  Double-clicking the handle resets to `initial` (or clears the variable).
  *  @param {string|Element} handle  the splitter element
  *  @param {Object}  [opts]
  *  @param {string|Element} [opts.container]  element the var is written on (default: nearest `.qry-workspace`, else the handle's parent)
  *  @param {string}  [opts.prop='--qry-aside-w']  CSS custom property to drive
  *  @param {'x'|'y'} [opts.axis='x']  x → width from container's left, y → height from its top
  *  @param {number}  [opts.min=150]
- *  @param {number}  [opts.max]   defaults to 60% of the container's size
- *  @param {Function}[opts.onResize]  (px:number) → void, called live during the drag
- *  @returns {{ destroy: Function }}
- *  @example makeSplitter('#split', { container: '.qry-workspace', prop: '--qry-aside-w', onResize: () => view.fit() })
+ *  @param {number|((boxSize:number)=>number)} [opts.max]  defaults to 60% of the container's size; a function gets the live container size
+ *  @param {number}  [opts.initial]  size (px) to apply immediately, and to reset to on double-click
+ *  @param {Function}[opts.onStart]  (px:number) → void, on pointer-down
+ *  @param {Function}[opts.onResize] (px:number) → void, live during the drag
+ *  @param {Function}[opts.onEnd]    (px:number) → void, on pointer-up (commit point)
+ *  @returns {{ set:(px:number)=>number, current:()=>number|null, reset:()=>void, destroy:Function }}
+ *  @example makeSplitter('#split', { prop: '--qry-aside-w', min: 150, max: 560, onResize: () => view.fit(), onEnd: () => scheduleRender() })
  */
 export const makeSplitter = (handle, {
-    container, prop = '--qry-aside-w', axis = 'x', min = 150, max, onResize,
+    container, prop = '--qry-aside-w', axis = 'x', min = 150, max, initial,
+    onStart, onResize, onEnd,
 } = {}) => {
     const el  = $(handle);
     // native closest is null-safe; qry's .parent(sel) returns a truthy <qry-nil>
     // on no match, which would defeat the `|| el.parentElement` fallback.
     const box = container ? $(container) : (el.closest('.qry-workspace') || el.parentElement);
+    const hiOf = bs => (max == null ? bs * 0.6 : (typeof max === 'function' ? max(bs) : max));
+    const sizeAt = clientPos => {
+        const r = box.getBoundingClientRect();
+        const bs = axis === 'y' ? r.height : r.width;
+        return clamp(clientPos - (axis === 'y' ? r.top : r.left), min, hiOf(bs));
+    };
+    const write = px => { box.style.setProperty(prop, px + 'px'); return px; };
+    const current = () => {
+        const v = parseFloat(getComputedStyle(box).getPropertyValue(prop));
+        return Number.isFinite(v) ? v : null;
+    };
     let dragging = false;
     const onDown = e => {
+        if (e.button != null && e.button !== 0) return;
         dragging = true; el.cls('+dragging');
         try { el.setPointerCapture(e.pointerId); } catch { /* ignore */ }
         e.preventDefault();
+        onStart?.(current() ?? sizeAt(axis === 'y' ? e.clientY : e.clientX));
     };
-    const onMove = e => {
-        if (!dragging) return;
-        const r = box.getBoundingClientRect();
-        const raw = axis === 'y' ? e.clientY - r.top : e.clientX - r.left;
-        const hi  = max ?? (axis === 'y' ? r.height : r.width) * 0.6;
-        const size = clamp(raw, min, hi);
-        box.style.setProperty(prop, size + 'px');     // custom props bypass qry's .css()
-        onResize?.(size);
+    const onMove = e => { if (dragging) onResize?.(write(sizeAt(axis === 'y' ? e.clientY : e.clientX))); };
+    const end = () => { if (dragging) { dragging = false; el.cls('-dragging'); onEnd?.(current()); } };
+    const onDbl = () => { if (initial != null) write(initial); else box.style.removeProperty(prop); onResize?.(current()); onEnd?.(current()); };
+    el.on('pointerdown', onDown).on('pointermove', onMove).on('pointerup', end).on('pointercancel', end).on('dblclick', onDbl);
+    if (initial != null) write(initial);
+    return {
+        set: px => { const v = clamp(px, min, hiOf(axis === 'y' ? box.getBoundingClientRect().height : box.getBoundingClientRect().width)); write(v); onResize?.(v); onEnd?.(v); return v; },
+        current,
+        reset: onDbl,
+        destroy() { el.off('pointerdown', onDown).off('pointermove', onMove).off('pointerup', end).off('pointercancel', end).off('dblclick', onDbl); },
     };
-    const end = () => { if (dragging) { dragging = false; el.cls('-dragging'); } };
-    el.on('pointerdown', onDown).on('pointermove', onMove).on('pointerup', end).on('pointercancel', end);
-    return { destroy() { el.off('pointerdown', onDown).off('pointermove', onMove).off('pointerup', end).off('pointercancel', end); } };
 };
 
 /** Wire a tab bar: clicking a tab activates it and reveals the matching panel(s).
  *  A panel may serve several tabs — list their names space-separated in its
  *  attribute. Purely class-driven; pairs with qry-ui.css `.qry-tab` / `.qry-panel`
  *  but runs on any selectors. Honours an already-`.active` tab as the start state.
+ *
+ *  Re-selecting the current tab is a no-op (no `onChange`) unless `select(name, true)`
+ *  forces it. With `keyboard` on (default), ←/→/Home/End move between tabs with
+ *  roving `tabindex`, so the bar is operable per the ARIA tablist pattern.
  *  @param {Object} [opts]
  *  @param {string} [opts.tabSel='.qry-tab']
  *  @param {string} [opts.panelSel='.qry-panel']
  *  @param {string} [opts.attr='data-tab']  value links a tab to its panel(s)
  *  @param {string} [opts.activeClass='active']
- *  @param {Function} [opts.onChange]  (name:string) → void
- *  @returns {{ select:(name:string)=>void, readonly current:string, destroy:Function }}
+ *  @param {boolean}[opts.keyboard=true]  arrow-key navigation + roving tabindex
+ *  @param {Function} [opts.onChange]  (name:string) → void  (only on an actual change)
+ *  @returns {{ select:(name:string, force?:boolean)=>void, readonly current:string, tabs:Element[], destroy:Function }}
  *  @example const tabs = makeTabs({ onChange: n => { if (n === 'page') render(); } })
  */
 export const makeTabs = ({
     tabSel = '.qry-tab', panelSel = '.qry-panel', attr = 'data-tab',
-    activeClass = 'active', onChange,
+    activeClass = 'active', keyboard = true, onChange,
 } = {}) => {
     const tabs = $.all(tabSel), panels = $.all(panelSel);
     let cur = null;
-    const select = name => {
+    const select = (name, force = false) => {
+        if (name == null || (name === cur && !force)) return;   // re-select is a no-op unless forced
         cur = name;
         tabs.forEach(t => {
             const on = t.attr(attr) === name;
             t.cls(on ? '+' + activeClass : '-' + activeClass).attr('aria-selected', on ? 'true' : 'false');
+            if (keyboard) t.attr('tabindex', on ? '0' : '-1');  // roving tabindex
         });
         panels.forEach(p => {                          // a panel's attr may list several tab names
             const serves = ' ' + (p.attr(attr) || '') + ' ';
@@ -679,65 +706,120 @@ export const makeTabs = ({
         onChange?.(name);
     };
     const onClick = function () { select(this.attr(attr)); };
-    tabs.forEach(t => t.on('click', onClick));
+    const onKey = function (e) {
+        const i = tabs.indexOf(this);
+        let j = i;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') j = (i + 1) % tabs.length;
+        else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') j = (i - 1 + tabs.length) % tabs.length;
+        else if (e.key === 'Home') j = 0;
+        else if (e.key === 'End') j = tabs.length - 1;
+        else return;
+        e.preventDefault();
+        tabs[j].focus(); select(tabs[j].attr(attr));
+    };
+    tabs.forEach(t => { t.on('click', onClick); if (keyboard) { t.attr('role', 'tab').on('keydown', onKey); } });
     const start = tabs.find(t => t.cls('?' + activeClass)) || tabs[0];
-    if (start) select(start.attr(attr));
+    if (start) select(start.attr(attr), true);
     return {
         select,
         get current() { return cur; },
-        destroy() { tabs.forEach(t => t.off('click', onClick)); },
+        tabs,
+        destroy() { tabs.forEach(t => { t.off('click', onClick); t.off('keydown', onKey); }); },
     };
 };
 
 /** Pan + zoom a large content element inside a scrollable stage.
  *  Zoom sets the content's width as a percentage (100% = fit at zoom 1) so the
- *  stage's own scrollbars track the overflow; Ctrl/⌘ + wheel zooms toward the
- *  cursor, left-drag pans. Pairs with the qry-ui.css `.qry-stage` container.
- *  Use `.css('width')` semantics — works whether the content is a div, <img>
- *  or <canvas> (it sets CSS width, never the bitmap size).
+ *  stage's own scrollbars track the overflow; it sets CSS width only, so the
+ *  content can be a div, <img> or <canvas> (the bitmap is never resized).
+ *
+ *  Inputs covered: Ctrl/⌘ + wheel zooms toward the cursor (or plain wheel with
+ *  `wheelModifier:false`), left-drag pans, two-finger pinch zooms toward the
+ *  pinch midpoint, double-click toggles zoom at the cursor. Button/programmatic
+ *  zoom anchors on the stage centre. Drags that start on an interactive child
+ *  (matched by `noPan`) are left alone. The content is resolved live, so it keeps
+ *  working after you swap the element inside the stage. Pairs with `.qry-stage`.
  *  @param {string|Element} stage  the scroll container
  *  @param {Object} [opts]
- *  @param {string|Element} [opts.content]  zoom target (default: stage's first element child)
- *  @param {number} [opts.min=0.25] @param {number} [opts.max=8] @param {number} [opts.step=1.25]
+ *  @param {string|Element} [opts.content]  zoom target (default: stage's first element child), resolved live
+ *  @param {number} [opts.min=0.25] @param {number} [opts.max=8]
+ *  @param {number} [opts.step=1.25]  button / dblclick factor
+ *  @param {number} [opts.wheelStep=1.1]  wheel factor per notch
+ *  @param {boolean}[opts.wheelModifier=true]  require Ctrl/⌘ for wheel-zoom (false → plain wheel zooms)
+ *  @param {boolean}[opts.dblClick=true]  double-click toggles zoom at the cursor
  *  @param {string} [opts.grabClass='grabbing']  class toggled on the stage while panning
+ *  @param {string} [opts.noPan]  selector of children that should NOT start a pan
  *  @param {Function} [opts.onZoom]  (zoom:number) → void  (e.g. re-render a raster at the new scale)
- *  @returns {{ zoom:(z:number)=>void, zoomIn:Function, zoomOut:Function, fit:Function, readonly current:number, destroy:Function }}
+ *  @param {Function} [opts.onPan]   (scrollLeft:number, scrollTop:number) → void
+ *  @returns {{ zoom:(z:number)=>void, zoomIn:Function, zoomOut:Function, zoomAt:(factor:number,clientX?:number,clientY?:number)=>void, fit:Function, reset:Function, readonly current:number, destroy:Function }}
  *  @example const view = makeZoomPan('#stage', { content: '#canvas', onZoom: () => scheduleRender() })
  */
 export const makeZoomPan = (stage, {
-    content, min = 0.25, max = 8, step = 1.25, grabClass = 'grabbing', onZoom,
+    content, min = 0.25, max = 8, step = 1.25, wheelStep = 1.1, wheelModifier = true,
+    dblClick = true, grabClass = 'grabbing',
+    noPan = 'a,button,input,select,textarea,label,[contenteditable],[data-no-pan]',
+    onZoom, onPan,
 } = {}) => {
     const s = $(stage);
-    const c = content ? $(content) : s.firstElementChild;   // native child; null if the stage is empty
+    const cv = () => (content ? $(content) : s.firstElementChild);   // resolved live → survives content swaps
     let z = 1;
-    const apply = () => { if (c) c.css('width', (z * 100) + '%'); };
-    const set = nz => { const prev = z; z = clamp(nz, min, max); apply(); onZoom?.(z); return z / prev; };
-    const zoomAt = (cx, cy, factor) => {
+    const apply = () => { const c = cv(); if (c) c.css('width', (z * 100) + '%'); };
+    const set = nz => { const prev = z; z = clamp(nz, min, max); apply(); onZoom?.(z); return prev ? z / prev : 1; };
+    // zoom by `factor` keeping the viewport point (cx,cy) fixed; defaults to the stage centre
+    const zoomAt = (factor, cx, cy) => {
         const r = s.getBoundingClientRect();
+        if (cx == null) { cx = r.left + s.clientWidth / 2; cy = r.top + s.clientHeight / 2; }
         const x = s.scrollLeft + (cx - r.left), y = s.scrollTop + (cy - r.top);
         const ratio = set(z * factor);
         s.scrollLeft = x * ratio - (cx - r.left);
         s.scrollTop  = y * ratio - (cy - r.top);
     };
-    const onWheel = e => { if (e.ctrlKey || e.metaKey) { e.preventDefault(); zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.1 : 0.9); } };
-    let panning = false, sx = 0, sy = 0, sl = 0, st = 0;
-    const onDown = e => {
-        if (e.button !== 0) return;
-        panning = true; sx = e.clientX; sy = e.clientY; sl = s.scrollLeft; st = s.scrollTop;
-        s.cls('+' + grabClass);
-        try { s.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    const onWheel = e => {
+        if (wheelModifier && !(e.ctrlKey || e.metaKey)) return;
+        e.preventDefault();
+        zoomAt(e.deltaY < 0 ? wheelStep : 1 / wheelStep, e.clientX, e.clientY);
     };
-    const onMove = e => { if (!panning) return; s.scrollLeft = sl - (e.clientX - sx); s.scrollTop = st - (e.clientY - sy); };
-    const end = () => { if (panning) { panning = false; s.cls('-' + grabClass); } };
-    s.on('wheel', onWheel, { passive: false }).on('pointerdown', onDown).on('pointermove', onMove).on('pointerup', end).on('pointercancel', end);
+    // one pointer registry drives both single-pointer pan and two-pointer pinch
+    const pts = new Map();
+    let panning = false, sx = 0, sy = 0, sl = 0, st = 0, pinch = 0;
+    const two = () => [...pts.values()];
+    const dist = () => { const [a, b] = two(); return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); };
+    const onDown = e => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        if (e.target.closest?.(noPan)) return;                 // don't hijack drags off interactive children
+        pts.set(e.pointerId, e);
+        try { s.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+        if (pts.size === 2) { panning = false; pinch = dist(); s.cls('-' + grabClass); }
+        else { panning = true; sx = e.clientX; sy = e.clientY; sl = s.scrollLeft; st = s.scrollTop; s.cls('+' + grabClass); }
+    };
+    const onMove = e => {
+        if (!pts.has(e.pointerId)) return;
+        pts.set(e.pointerId, e);
+        if (pts.size >= 2) { const d = dist(); if (pinch) { const [a, b] = two(); zoomAt(d / pinch, (a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2); } pinch = d; }
+        else if (panning) { s.scrollLeft = sl - (e.clientX - sx); s.scrollTop = st - (e.clientY - sy); onPan?.(s.scrollLeft, s.scrollTop); }
+    };
+    const end = e => {
+        pts.delete(e.pointerId);
+        if (pts.size < 2) pinch = 0;
+        if (pts.size === 0) { panning = false; s.cls('-' + grabClass); }
+    };
+    const onDbl = e => { if (dblClick) zoomAt(z > 1 ? 1 / z : step * step, e.clientX, e.clientY); };
+    s.on('wheel', onWheel, { passive: false })
+     .on('pointerdown', onDown).on('pointermove', onMove)
+     .on('pointerup', end).on('pointercancel', end).on('dblclick', onDbl);
     apply();
     return {
-        zoom: v => { set(v); },
-        zoomIn:  () => { set(z * step); },
-        zoomOut: () => { set(z / step); },
-        fit:     () => { set(1); s.scrollTop = 0; s.scrollLeft = 0; },
+        zoom: v => set(v),
+        zoomIn:  () => zoomAt(step),
+        zoomOut: () => zoomAt(1 / step),
+        zoomAt,
+        fit:   () => { set(1); s.scrollLeft = 0; s.scrollTop = 0; },
+        reset: () => { set(1); s.scrollLeft = 0; s.scrollTop = 0; },
         get current() { return z; },
-        destroy() { s.off('wheel', onWheel).off('pointerdown', onDown).off('pointermove', onMove).off('pointerup', end).off('pointercancel', end); },
+        destroy() {
+            s.off('wheel', onWheel).off('pointerdown', onDown).off('pointermove', onMove)
+             .off('pointerup', end).off('pointercancel', end).off('dblclick', onDbl);
+        },
     };
 };
 
@@ -1038,70 +1120,95 @@ export const boot = ({ ready, theme: useTheme = true, icons: useIcons = true, ti
 // widget layer, so there are no <sl-*> wrappers here.
 
 /** A label / value line (`.qry-info-row`). Append several into a panel for a
- *  compact key→value summary.
- *  @param {string} label @param {string} value @param {string} [cls]  extra class on the value span
+ *  compact key→value summary. `label`/`value` may each be a string (set as text)
+ *  or a Node (appended — e.g. a chip, link or badge).
+ *  @param {string|Node} label @param {string|Node} value @param {string} [cls]  extra class on the value span
  *  @returns {Element}
  *  @example meta.add(makeRow('Pages', String(doc.pages.length)))
  */
 export const makeRow = (label, value, cls = '') => {
     const row = $.create('div', { class: 'qry-info-row' });
-    row.add($.create('span', { class: 'qry-info-label', text: label }));
-    row.add($.create('span', { class: `qry-info-value${cls ? ' ' + cls : ''}`, text: value }));
-    return row;
+    const l = $.create('span', { class: 'qry-info-label' });
+    if (label instanceof Node) l.add(label); else l.text(label == null ? '' : String(label));
+    const v = $.create('span', { class: `qry-info-value${cls ? ' ' + cls : ''}` });
+    if (value instanceof Node) v.add(value); else v.text(value == null ? '' : String(value));
+    return row.add(l).add(v);
 };
 
 /** A wrap of selectable pills (`.qry-chip`). Each item may be a string or an
- *  object with `{ key|name|label }`; the one whose key === `selected` gets
- *  `.selected`. `onClick` receives the original item.
+ *  object; by default the key is `key|name|label|item` and the label is
+ *  `label|name|item`. `selected` may be a single key or an array (multi-select);
+ *  matching chips get `.selected`. `onClick(item, key)` fires per pill. The wrap
+ *  carries `.select(sel)` to re-apply the highlight without rebuilding.
  *  @param {Array} items
- *  @param {*} selected  key of the active item
- *  @param {(item:*)=>void} onClick
- *  @returns {Element}
- *  @example panel.add(makeChips(formats, current, f => pick(f.key)))
+ *  @param {*|Array} selected  active key, or array of keys
+ *  @param {(item:*, key:*)=>void} onClick
+ *  @param {Object} [opts]
+ *  @param {(item:*)=>*} [opts.key]    custom key accessor
+ *  @param {(item:*)=>string} [opts.label]  custom label accessor
+ *  @param {string} [opts.class]  extra class on the wrap
+ *  @returns {Element & { select:(sel:*|Array)=>Element }}
+ *  @example const chips = makeChips(formats, current, f => pick(f.key)); chips.select(next)
  */
-export const makeChips = (items, selected, onClick) => {
-    const wrap = $.create('div', { class: 'flex flex-wrap gap-2' });
-    for (const item of items) {
-        const key = item.key ?? item.name ?? item.label ?? item;
-        const chip = $.create('div', { class: `qry-chip${key === selected ? ' selected' : ''}`, text: item.label ?? item });
-        chip.on('click', () => onClick(item));
+export const makeChips = (items, selected, onClick, opts = {}) => {
+    const keyOf   = opts.key   || (i => i?.key ?? i?.name ?? i?.label ?? i);
+    const labelOf = opts.label || (i => i?.label ?? i?.name ?? i);
+    const isSel = (k, sel) => Array.isArray(sel) ? sel.includes(k) : k === sel;
+    const wrap = $.create('div', { class: 'flex flex-wrap gap-2' + (opts.class ? ' ' + opts.class : '') });
+    const chips = items.map(item => {
+        const k = keyOf(item);
+        const chip = $.create('div', { class: 'qry-chip', text: String(labelOf(item)), 'data-key': String(k) });
+        if (isSel(k, selected)) chip.cls('+selected');
+        if (onClick) chip.on('click', () => onClick(item, k));
         wrap.add(chip);
-    }
+        return { k, chip };
+    });
+    wrap.select = sel => { chips.forEach(({ k, chip }) => chip.cls(isSel(k, sel) ? '+selected' : '-selected')); return wrap; };
     return wrap;
 };
 
 /** A sortable table (`.qry-table`). Click a header to sort; the column's `num`
- *  flag picks numeric vs locale text comparison and right-aligns it. Sorting is
- *  internal (re-renders in place); the element is returned ready to append.
+ *  flag picks numeric vs locale text comparison and right-aligns it. Values are
+ *  HTML-escaped (a `fmt` may return trusted markup). The returned element carries
+ *  `.update(rows)` and `.sortBy(key, dir?)` so the data can refresh in place.
  *  @param {Array<{key:string,label:string,num?:boolean,fmt?:(v:*,row:object)=>string}>} cols
  *  @param {Array<object>} rows
  *  @param {Object} [opts]
  *  @param {boolean} [opts.index]  prepend a 1-based `#` column
  *  @param {{key:string,dir:'asc'|'desc'}} [opts.sort]  initial sort (default: first numeric col desc, else first col asc)
- *  @returns {Element}
- *  @example wrap.add(sortableTable([{key:'name',label:'Font'},{key:'glyphs',label:'Glyphs',num:1}], fonts, { index: true }))
+ *  @param {(row:object, tr:Element)=>void} [opts.onRow]  body-row click handler
+ *  @param {string} [opts.empty='No data']  message shown when there are no rows
+ *  @param {string} [opts.class]  extra class on the table
+ *  @returns {Element & { update:(rows:object[])=>Element, sortBy:(key:string,dir?:string)=>Element }}
+ *  @example const t = sortableTable(cols, fonts, { index: true, onRow: f => pick(f) }); later: t.update(next)
  */
 export const sortableTable = (cols, rows, opts = {}) => {
     const state = opts.sort ? { ...opts.sort }
         : { key: (cols.find(c => c.num) || cols[0]).key, dir: cols.find(c => c.num) ? 'desc' : 'asc' };
-    const table = $.create('table', { class: 'qry-table' });
+    let data = (rows || []).slice();
+    let view = [];                                    // current sorted rows, index-aligned to the body <tr>s
+    const table = $.create('table', { class: 'qry-table' + (opts.class ? ' ' + opts.class : '') });
     const esc = v => String(v).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+    const span = cols.length + (opts.index ? 1 : 0);
     function render() {
         const col = cols.find(c => c.key === state.key);
-        const sorted = [...rows].sort((a, b) => {
+        view = [...data].sort((a, b) => {
             let va = a[state.key], vb = b[state.key];
             if (col && col.num) return state.dir === 'asc' ? (+va || 0) - (+vb || 0) : (+vb || 0) - (+va || 0);
             va = String(va ?? ''); vb = String(vb ?? '');
             return state.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
         });
+        const aria  = c => c.key !== state.key ? 'none' : (state.dir === 'asc' ? 'ascending' : 'descending');
         const arrow = c => c.key === state.key ? (state.dir === 'asc' ? ' \u25B2' : ' \u25BC') : '';
-        const head = '<thead><tr>' + (opts.index ? '<th class="num idx">#</th>' : '')
-            + cols.map(c => `<th data-key="${c.key}" class="${c.num ? 'num' : ''}`
-                + `${c.key === state.key ? ' sorted' : ''}">${c.label}${arrow(c)}</th>`).join('') + '</tr></thead>';
-        const body = '<tbody>' + sorted.map((r, i) => '<tr>'
-            + (opts.index ? `<td class="num idx">${i + 1}</td>` : '')
-            + cols.map(c => `<td class="${c.num ? 'num' : ''}">${c.fmt ? c.fmt(r[c.key], r) : esc(r[c.key] ?? '\u2013')}</td>`).join('')
-            + '</tr>').join('') + '</tbody>';
+        const head = '<thead><tr>' + (opts.index ? '<th scope="col" class="num idx">#</th>' : '')
+            + cols.map(c => `<th data-key="${c.key}" scope="col" aria-sort="${aria(c)}" class="${c.num ? 'num' : ''}`
+                + `${c.key === state.key ? ' sorted' : ''}">${esc(c.label)}${arrow(c)}</th>`).join('') + '</tr></thead>';
+        const body = view.length
+            ? '<tbody>' + view.map((r, i) => `<tr data-i="${i}">`
+                + (opts.index ? `<td class="num idx">${i + 1}</td>` : '')
+                + cols.map(c => `<td class="${c.num ? 'num' : ''}">${c.fmt ? c.fmt(r[c.key], r) : esc(r[c.key] ?? '\u2013')}</td>`).join('')
+                + '</tr>').join('') + '</tbody>'
+            : `<tbody><tr class="qry-table-empty"><td colspan="${span}">${esc(opts.empty ?? 'No data')}</td></tr></tbody>`;
         table.html(head + body);
     }
     table.delegate('th[data-key]', 'click', function () {
@@ -1110,6 +1217,9 @@ export const sortableTable = (cols, rows, opts = {}) => {
         else { state.key = k; state.dir = cols.find(c => c.key === k).num ? 'desc' : 'asc'; }
         render();
     });
+    if (opts.onRow) table.delegate('tbody tr[data-i]', 'click', function () { opts.onRow(view[+this.attr('data-i')], this); });
     render();
+    table.update = next => { data = (next || []).slice(); render(); return table; };
+    table.sortBy = (key, dir) => { state.key = key; if (dir) state.dir = dir; render(); return table; };
     return table;
 };

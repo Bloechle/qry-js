@@ -29,7 +29,7 @@
  *
  * Values must be JSON-safe (they live in localStorage). Requires qry.js (global `$`).
  *
- * @version 1.1.0
+ * @version 1.3.0
  * @author  Jean-Luc Bloechle with Claude.ai
  * @license MIT
  */
