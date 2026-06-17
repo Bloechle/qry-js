@@ -287,6 +287,10 @@ A selector that matches nothing returns a fresh detached `<qry-nil>` element and
 
 Modern evergreen browsers: Chrome, Firefox, Safari, Edge. Uses ES2020+ features (optional chaining, nullish coalescing) and standard DOM APIs.
 
+## Changelog
+
+See [`CHANGES.md`](./CHANGES.md) for the per-version history.
+
 ## License
 
 MIT © Jean-Luc Bloechle
