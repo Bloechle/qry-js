@@ -18,9 +18,12 @@
  *   • `make*` builds something STATEFUL and returns a controller object.
  *     Those that bind listeners or inject DOM also expose `.destroy()` to
  *     unwind cleanly:
- *         makeSidebar · makeAutoHideHeader · makeKeyboard ·
- *         makeDropZone · makeIframeAutoHeight
+ *         makeSidebar · makeAutoHideHeader · makeSplitter · makeTabs ·
+ *         makeZoomPan · makeKeyboard · makeDropZone · makeIframeAutoHeight
  *     (makeStore returns a plain get/set store — nothing to tear down.)
+ *   • A few builders return a ready DOM element rather than a controller:
+ *     makeRow, makeChips (and sortableTable, named plainly as it yields a
+ *     <table>) — append them and you're done, there is no `.destroy()`.
  *   • Everything injected into the DOM is prefixed `qry-`.
  *
  * ── Contents ─────────────────────────────────────────────────────────────────
@@ -32,16 +35,17 @@
  *   6. Network         api
  *   7. Clipboard/files copy · download · readFiles · onPasteFile
  *   8. Notifications   toast · confirm · prompt
- *   9. Layout (make*)  makeSidebar · makeAutoHideHeader
+ *   9. Layout (make*)  makeSidebar · makeAutoHideHeader · makeSplitter · makeTabs · makeZoomPan
  *  10. Input (make*)   makeKeyboard · bindAll
  *  11. Drop zone       makeDropZone
  *  12. Iframe embed    makeIframeAutoHeight (child) · embedIframe (parent)
  *  13. Boot            boot
+ *  14. Components       makeRow · makeChips · sortableTable  (builders → element)
  *
  * Requires qry.js loaded first as a <script> (provides window.$). Functions that
  * build widgets (toast, confirm, prompt) require Shoelace's autoloader.
  *
- * @version 1.1.0
+ * @version 1.2.0
  * @author  Jean-Luc Bloechle with Claude.ai
  * @license MIT
  */
@@ -600,6 +604,143 @@ export const makeAutoHideHeader = ({
     };
 };
 
+/** Make a drag handle resize a sibling pane by writing a CSS length variable.
+ *  qry's `.css()` can't set custom properties, so the var is written via the
+ *  native style API on the container. Pairs with the qry-ui.css `.qry-split`
+ *  handle and the `.qry-workspace` shell (whose aside reads `--qry-aside-w`),
+ *  but works on any container/variable you point it at.
+ *  @param {string|Element} handle  the splitter element
+ *  @param {Object}  [opts]
+ *  @param {string|Element} [opts.container]  element the var is written on (default: nearest `.qry-workspace`, else the handle's parent)
+ *  @param {string}  [opts.prop='--qry-aside-w']  CSS custom property to drive
+ *  @param {'x'|'y'} [opts.axis='x']  x → width from container's left, y → height from its top
+ *  @param {number}  [opts.min=150]
+ *  @param {number}  [opts.max]   defaults to 60% of the container's size
+ *  @param {Function}[opts.onResize]  (px:number) → void, called live during the drag
+ *  @returns {{ destroy: Function }}
+ *  @example makeSplitter('#split', { container: '.qry-workspace', prop: '--qry-aside-w', onResize: () => view.fit() })
+ */
+export const makeSplitter = (handle, {
+    container, prop = '--qry-aside-w', axis = 'x', min = 150, max, onResize,
+} = {}) => {
+    const el  = $(handle);
+    // native closest is null-safe; qry's .parent(sel) returns a truthy <qry-nil>
+    // on no match, which would defeat the `|| el.parentElement` fallback.
+    const box = container ? $(container) : (el.closest('.qry-workspace') || el.parentElement);
+    let dragging = false;
+    const onDown = e => {
+        dragging = true; el.cls('+dragging');
+        try { el.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+        e.preventDefault();
+    };
+    const onMove = e => {
+        if (!dragging) return;
+        const r = box.getBoundingClientRect();
+        const raw = axis === 'y' ? e.clientY - r.top : e.clientX - r.left;
+        const hi  = max ?? (axis === 'y' ? r.height : r.width) * 0.6;
+        const size = clamp(raw, min, hi);
+        box.style.setProperty(prop, size + 'px');     // custom props bypass qry's .css()
+        onResize?.(size);
+    };
+    const end = () => { if (dragging) { dragging = false; el.cls('-dragging'); } };
+    el.on('pointerdown', onDown).on('pointermove', onMove).on('pointerup', end).on('pointercancel', end);
+    return { destroy() { el.off('pointerdown', onDown).off('pointermove', onMove).off('pointerup', end).off('pointercancel', end); } };
+};
+
+/** Wire a tab bar: clicking a tab activates it and reveals the matching panel(s).
+ *  A panel may serve several tabs — list their names space-separated in its
+ *  attribute. Purely class-driven; pairs with qry-ui.css `.qry-tab` / `.qry-panel`
+ *  but runs on any selectors. Honours an already-`.active` tab as the start state.
+ *  @param {Object} [opts]
+ *  @param {string} [opts.tabSel='.qry-tab']
+ *  @param {string} [opts.panelSel='.qry-panel']
+ *  @param {string} [opts.attr='data-tab']  value links a tab to its panel(s)
+ *  @param {string} [opts.activeClass='active']
+ *  @param {Function} [opts.onChange]  (name:string) → void
+ *  @returns {{ select:(name:string)=>void, readonly current:string, destroy:Function }}
+ *  @example const tabs = makeTabs({ onChange: n => { if (n === 'page') render(); } })
+ */
+export const makeTabs = ({
+    tabSel = '.qry-tab', panelSel = '.qry-panel', attr = 'data-tab',
+    activeClass = 'active', onChange,
+} = {}) => {
+    const tabs = $.all(tabSel), panels = $.all(panelSel);
+    let cur = null;
+    const select = name => {
+        cur = name;
+        tabs.forEach(t => {
+            const on = t.attr(attr) === name;
+            t.cls(on ? '+' + activeClass : '-' + activeClass).attr('aria-selected', on ? 'true' : 'false');
+        });
+        panels.forEach(p => {                          // a panel's attr may list several tab names
+            const serves = ' ' + (p.attr(attr) || '') + ' ';
+            p.cls(serves.includes(' ' + name + ' ') ? '+' + activeClass : '-' + activeClass);
+        });
+        onChange?.(name);
+    };
+    const onClick = function () { select(this.attr(attr)); };
+    tabs.forEach(t => t.on('click', onClick));
+    const start = tabs.find(t => t.cls('?' + activeClass)) || tabs[0];
+    if (start) select(start.attr(attr));
+    return {
+        select,
+        get current() { return cur; },
+        destroy() { tabs.forEach(t => t.off('click', onClick)); },
+    };
+};
+
+/** Pan + zoom a large content element inside a scrollable stage.
+ *  Zoom sets the content's width as a percentage (100% = fit at zoom 1) so the
+ *  stage's own scrollbars track the overflow; Ctrl/⌘ + wheel zooms toward the
+ *  cursor, left-drag pans. Pairs with the qry-ui.css `.qry-stage` container.
+ *  Use `.css('width')` semantics — works whether the content is a div, <img>
+ *  or <canvas> (it sets CSS width, never the bitmap size).
+ *  @param {string|Element} stage  the scroll container
+ *  @param {Object} [opts]
+ *  @param {string|Element} [opts.content]  zoom target (default: stage's first element child)
+ *  @param {number} [opts.min=0.25] @param {number} [opts.max=8] @param {number} [opts.step=1.25]
+ *  @param {string} [opts.grabClass='grabbing']  class toggled on the stage while panning
+ *  @param {Function} [opts.onZoom]  (zoom:number) → void  (e.g. re-render a raster at the new scale)
+ *  @returns {{ zoom:(z:number)=>void, zoomIn:Function, zoomOut:Function, fit:Function, readonly current:number, destroy:Function }}
+ *  @example const view = makeZoomPan('#stage', { content: '#canvas', onZoom: () => scheduleRender() })
+ */
+export const makeZoomPan = (stage, {
+    content, min = 0.25, max = 8, step = 1.25, grabClass = 'grabbing', onZoom,
+} = {}) => {
+    const s = $(stage);
+    const c = content ? $(content) : s.firstElementChild;   // native child; null if the stage is empty
+    let z = 1;
+    const apply = () => { if (c) c.css('width', (z * 100) + '%'); };
+    const set = nz => { const prev = z; z = clamp(nz, min, max); apply(); onZoom?.(z); return z / prev; };
+    const zoomAt = (cx, cy, factor) => {
+        const r = s.getBoundingClientRect();
+        const x = s.scrollLeft + (cx - r.left), y = s.scrollTop + (cy - r.top);
+        const ratio = set(z * factor);
+        s.scrollLeft = x * ratio - (cx - r.left);
+        s.scrollTop  = y * ratio - (cy - r.top);
+    };
+    const onWheel = e => { if (e.ctrlKey || e.metaKey) { e.preventDefault(); zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.1 : 0.9); } };
+    let panning = false, sx = 0, sy = 0, sl = 0, st = 0;
+    const onDown = e => {
+        if (e.button !== 0) return;
+        panning = true; sx = e.clientX; sy = e.clientY; sl = s.scrollLeft; st = s.scrollTop;
+        s.cls('+' + grabClass);
+        try { s.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    };
+    const onMove = e => { if (!panning) return; s.scrollLeft = sl - (e.clientX - sx); s.scrollTop = st - (e.clientY - sy); };
+    const end = () => { if (panning) { panning = false; s.cls('-' + grabClass); } };
+    s.on('wheel', onWheel, { passive: false }).on('pointerdown', onDown).on('pointermove', onMove).on('pointerup', end).on('pointercancel', end);
+    apply();
+    return {
+        zoom: v => { set(v); },
+        zoomIn:  () => { set(z * step); },
+        zoomOut: () => { set(z / step); },
+        fit:     () => { set(1); s.scrollTop = 0; s.scrollLeft = 0; },
+        get current() { return z; },
+        destroy() { s.off('wheel', onWheel).off('pointerdown', onDown).off('pointermove', onMove).off('pointerup', end).off('pointercancel', end); },
+    };
+};
+
 // ─── 10. Input (make*) — keyboard & declarative event binding ────────────────
 
 /** Global keyboard shortcuts. Returns a controller: `on(key, fn, opts)` registers
@@ -889,4 +1030,86 @@ export const boot = ({ ready, theme: useTheme = true, icons: useIcons = true, ti
         if (useIcons) icons();
         ready?.();
     });
+};
+
+// ─── 14. Components — DOM builders over qry-ui.css ───────────────────────────
+// These RETURN a ready element (no controller, no .destroy()): build, then
+// append. Thin conveniences over qry-ui.css components — Shoelace stays the
+// widget layer, so there are no <sl-*> wrappers here.
+
+/** A label / value line (`.qry-info-row`). Append several into a panel for a
+ *  compact key→value summary.
+ *  @param {string} label @param {string} value @param {string} [cls]  extra class on the value span
+ *  @returns {Element}
+ *  @example meta.add(makeRow('Pages', String(doc.pages.length)))
+ */
+export const makeRow = (label, value, cls = '') => {
+    const row = $.create('div', { class: 'qry-info-row' });
+    row.add($.create('span', { class: 'qry-info-label', text: label }));
+    row.add($.create('span', { class: `qry-info-value${cls ? ' ' + cls : ''}`, text: value }));
+    return row;
+};
+
+/** A wrap of selectable pills (`.qry-chip`). Each item may be a string or an
+ *  object with `{ key|name|label }`; the one whose key === `selected` gets
+ *  `.selected`. `onClick` receives the original item.
+ *  @param {Array} items
+ *  @param {*} selected  key of the active item
+ *  @param {(item:*)=>void} onClick
+ *  @returns {Element}
+ *  @example panel.add(makeChips(formats, current, f => pick(f.key)))
+ */
+export const makeChips = (items, selected, onClick) => {
+    const wrap = $.create('div', { class: 'flex flex-wrap gap-2' });
+    for (const item of items) {
+        const key = item.key ?? item.name ?? item.label ?? item;
+        const chip = $.create('div', { class: `qry-chip${key === selected ? ' selected' : ''}`, text: item.label ?? item });
+        chip.on('click', () => onClick(item));
+        wrap.add(chip);
+    }
+    return wrap;
+};
+
+/** A sortable table (`.qry-table`). Click a header to sort; the column's `num`
+ *  flag picks numeric vs locale text comparison and right-aligns it. Sorting is
+ *  internal (re-renders in place); the element is returned ready to append.
+ *  @param {Array<{key:string,label:string,num?:boolean,fmt?:(v:*,row:object)=>string}>} cols
+ *  @param {Array<object>} rows
+ *  @param {Object} [opts]
+ *  @param {boolean} [opts.index]  prepend a 1-based `#` column
+ *  @param {{key:string,dir:'asc'|'desc'}} [opts.sort]  initial sort (default: first numeric col desc, else first col asc)
+ *  @returns {Element}
+ *  @example wrap.add(sortableTable([{key:'name',label:'Font'},{key:'glyphs',label:'Glyphs',num:1}], fonts, { index: true }))
+ */
+export const sortableTable = (cols, rows, opts = {}) => {
+    const state = opts.sort ? { ...opts.sort }
+        : { key: (cols.find(c => c.num) || cols[0]).key, dir: cols.find(c => c.num) ? 'desc' : 'asc' };
+    const table = $.create('table', { class: 'qry-table' });
+    const esc = v => String(v).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+    function render() {
+        const col = cols.find(c => c.key === state.key);
+        const sorted = [...rows].sort((a, b) => {
+            let va = a[state.key], vb = b[state.key];
+            if (col && col.num) return state.dir === 'asc' ? (+va || 0) - (+vb || 0) : (+vb || 0) - (+va || 0);
+            va = String(va ?? ''); vb = String(vb ?? '');
+            return state.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+        });
+        const arrow = c => c.key === state.key ? (state.dir === 'asc' ? ' \u25B2' : ' \u25BC') : '';
+        const head = '<thead><tr>' + (opts.index ? '<th class="num idx">#</th>' : '')
+            + cols.map(c => `<th data-key="${c.key}" class="${c.num ? 'num' : ''}`
+                + `${c.key === state.key ? ' sorted' : ''}">${c.label}${arrow(c)}</th>`).join('') + '</tr></thead>';
+        const body = '<tbody>' + sorted.map((r, i) => '<tr>'
+            + (opts.index ? `<td class="num idx">${i + 1}</td>` : '')
+            + cols.map(c => `<td class="${c.num ? 'num' : ''}">${c.fmt ? c.fmt(r[c.key], r) : esc(r[c.key] ?? '\u2013')}</td>`).join('')
+            + '</tr>').join('') + '</tbody>';
+        table.html(head + body);
+    }
+    table.delegate('th[data-key]', 'click', function () {
+        const k = this.attr('data-key');
+        if (state.key === k) state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+        else { state.key = k; state.dir = cols.find(c => c.key === k).num ? 'desc' : 'asc'; }
+        render();
+    });
+    render();
+    return table;
 };

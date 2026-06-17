@@ -42,7 +42,7 @@ Via CDN (jsDelivr, from GitHub):
 
 ```html
 <!-- pinned to a release (recommended) -->
-<script src="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.1.0/qry.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.2.0/qry.js"></script>
 
 <!-- or always the latest -->
 <script src="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@latest/qry.js"></script>
@@ -202,11 +202,11 @@ The tooltip ships **mechanics only** (position, fade, never eats the mouse) and 
 
 | File | Role | CDN |
 |---|---|---|
-| `qry.js` | DOM core — the global `$` | `gh/Bloechle/qry-js@1.1.0/qry.js` |
-| `qry-ui.css` | App shell + design tokens (light/dark, built on Shoelace) | `gh/Bloechle/qry-js@1.1.0/qry-ui.css` |
-| `qry-kit.js` | Glue: theme, toast, files, keyboard, iframe embed, boot… | `gh/Bloechle/qry-js@1.1.0/qry-kit.js` |
-| `qry-devtools.js` | Optional in-page console + element inspector | `gh/Bloechle/qry-js@1.1.0/qry-devtools.js` |
-| `qry-bridge.js` | Optional cross-page shared store over a hidden iframe | `gh/Bloechle/qry-js@1.1.0/qry-bridge.js` |
+| `qry.js` | DOM core — the global `$` | `gh/Bloechle/qry-js@1.2.0/qry.js` |
+| `qry-ui.css` | App shell + design tokens (light/dark, built on Shoelace) | `gh/Bloechle/qry-js@1.2.0/qry-ui.css` |
+| `qry-kit.js` | Glue: theme, toast, files, keyboard, iframe embed, boot… | `gh/Bloechle/qry-js@1.2.0/qry-kit.js` |
+| `qry-devtools.js` | Optional in-page console + element inspector | `gh/Bloechle/qry-js@1.2.0/qry-devtools.js` |
+| `qry-bridge.js` | Optional cross-page shared store over a hidden iframe | `gh/Bloechle/qry-js@1.2.0/qry-bridge.js` |
 
 Pair it with [Shoelace](https://shoelace.style) for widgets and
 [Lucide](https://lucide.dev) for icons. No build step — everything is served
@@ -221,12 +221,12 @@ from GitHub via jsDelivr, pinned to a release.
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
 
 <!-- qry-ui.css (shell) + Lucide (icons) + qry.js core -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.1.0/qry-ui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.2.0/qry-ui.css">
 <script src="https://cdn.jsdelivr.net/npm/lucide@1.17.0/dist/umd/lucide.min.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.1.0/qry.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.2.0/qry.js"></script>
 
 <script type="module">
-    import { boot, theme, toast } from 'https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.1.0/qry-kit.js';
+    import { boot, theme, toast } from 'https://cdn.jsdelivr.net/gh/Bloechle/qry-js@1.2.0/qry-kit.js';
     boot({ title: 'My app', ready: () => toast('Ready', 'success') });
 </script>
 ```
@@ -242,16 +242,23 @@ A flat set of named ES exports — import only what a page needs. Pure helpers a
 one-shot actions are bare functions (`clamp`, `toast`, `copy`); cohesive
 families are namespaces (`format.*`, `str.*`, `theme.*`); anything stateful is a
 `make*` factory returning a controller with `.destroy()` (`makeSidebar`,
-`makeDropZone`, `makeIframeAutoHeight`…). One switch — `theme.toggle()` — drives
-both the qry-ui.css tokens and every Shoelace widget. See the header of
-[`qry-kit.js`](./qry-kit.js) for the full contents.
+`makeDropZone`, `makeIframeAutoHeight`, plus the layout/viewport set
+`makeSplitter`, `makeTabs`, `makeZoomPan`…). A few builders instead return a
+ready element you just append — `makeRow`, `makeChips`, `sortableTable`. One
+switch — `theme.toggle()` — drives both the qry-ui.css tokens and every Shoelace
+widget. See the header of [`qry-kit.js`](./qry-kit.js) for the full contents.
 
 ### qry-ui.css
 
-The app shell and design system: header/sidebar/content layout, cards, metrics,
-buttons, drop overlays, and a full set of semantic tokens defined once for light
-and once for dark — so dark mode falls out with no rule duplication. Class
-namespace is `.qry-*`.
+The app shell and design system. Two layouts to start from: the
+`.qry-dashboard` header/sidebar/content shell, and the full-screen
+`.qry-workspace` grid (header · resizable aside · main · footer — the aside
+width is driven live by `makeSplitter`). Plus cards, metrics, buttons, tabs
+(`.qry-tabs`/`.qry-panel`, paired with `makeTabs`), a pan/zoom `.qry-stage`
+(paired with `makeZoomPan`), a sortable `.qry-table` (paired with
+`sortableTable`), drop overlays, and a full set of semantic tokens defined once
+for light and once for dark — so dark mode falls out with no rule duplication.
+Class namespace is `.qry-*`.
 
 ### qry-devtools.js (optional)
 

@@ -11,7 +11,7 @@
  *
  * Class namespace: .qry-*  ·  Shoelace tokens re-pointed at qry tokens below.
  *
- * @version 1.0.0
+ * @version 1.2.0
  * @author  Jean-Luc Bloechle with Claude.ai
  * @license MIT
  */
@@ -1148,3 +1148,95 @@ sl-radio-group sl-radio-button:last-of-type::part(button) {
 sl-radio-group sl-radio-button:only-of-type::part(button) {
     border-radius: var(--qry-radius-sm);
 }
+/* ═══════════════════════════════════════════════════════════════════════════
+   WORKSPACE SHELL
+   Full-screen grid app (header · body · footer) — an alternative to the
+   .qry-dashboard sidebar layout for document/tool UIs. Body is aside | split |
+   main; the aside width is `--qry-aside-w`, driven live by kit makeSplitter.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.qry-workspace {
+    --qry-aside-w: 232px;
+    height: 100vh; width: 100vw; overflow: hidden;
+    display: grid; grid-template-rows: auto 1fr auto;
+    background: var(--qry-bg);
+}
+.qry-workspace-header,
+.qry-workspace-footer {
+    display: flex; align-items: center; gap: .5rem;
+    padding: 0 .6rem; background: var(--qry-surface);
+}
+.qry-workspace-header { height: 46px; border-bottom: 1px solid var(--qry-line-strong); }
+.qry-workspace-footer {
+    height: 32px; padding: 0 .5rem; border-top: 1px solid var(--qry-line-strong);
+    font-size: .76rem; color: var(--qry-text-muted);
+}
+.qry-workspace-spacer { flex: 1 1 auto; }
+
+.qry-workspace-body { min-height: 0; display: flex; }
+.qry-workspace-aside {
+    flex: 0 0 var(--qry-aside-w); width: var(--qry-aside-w); min-width: 0;
+    display: flex; flex-direction: column; min-height: 0;
+    background: var(--qry-surface); border-right: 1px solid var(--qry-line);
+}
+.qry-workspace.aside-collapsed .qry-workspace-aside,
+.qry-workspace.aside-collapsed .qry-split { display: none; }
+.qry-workspace-main {
+    flex: 1 1 auto; min-width: 0; min-height: 0; position: relative;
+    display: flex; overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SPLITTER — drag handle between two panes (kit makeSplitter)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.qry-split { flex: 0 0 6px; cursor: col-resize; background: transparent; position: relative; }
+.qry-split::after {
+    content: ''; position: absolute; inset: 0 2px; border-radius: 2px;
+    background: var(--qry-line); transition: background var(--qry-transition);
+}
+.qry-split:hover::after, .qry-split.dragging::after { background: var(--qry-blue); }
+.qry-split.horizontal { cursor: row-resize; }
+.qry-split.horizontal::after { inset: 2px 0; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TABS — tab bar + switchable panels (kit makeTabs)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.qry-tabs { display: flex; align-items: stretch; gap: .15rem; }
+.qry-tab {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: 0 .9rem; border: 0; background: transparent; cursor: pointer;
+    font-size: .85rem; font-weight: 600; color: var(--qry-text-muted);
+    border-bottom: 2px solid transparent;
+    transition: color var(--qry-transition), border-color var(--qry-transition), background var(--qry-transition);
+}
+.qry-tab:hover  { color: var(--qry-text); background: var(--qry-tint-soft); }
+.qry-tab.active { color: var(--qry-blue); border-bottom-color: var(--qry-blue); }
+.qry-tab svg, .qry-tab i[data-lucide] { width: 1rem; height: 1rem; }
+.qry-panel { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.qry-panel:not(.active) { display: none !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STAGE — scrollable pan/zoom viewport (kit makeZoomPan)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.qry-stage {
+    flex: 1 1 auto; min-height: 0; overflow: auto; position: relative;
+    background: var(--qry-bg); cursor: grab; touch-action: none;
+}
+.qry-stage.grabbing { cursor: grabbing; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DATA TABLE — sortable, sticky header (kit sortableTable)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.qry-table { width: 100%; border-collapse: collapse; font-size: .8rem; font-variant-numeric: tabular-nums; }
+.qry-table th, .qry-table td { padding: .34rem .55rem; text-align: left; white-space: nowrap; }
+.qry-table th {
+    position: sticky; top: 0; z-index: 1; background: var(--qry-glass-strong);
+    backdrop-filter: blur(var(--qry-blur)); -webkit-backdrop-filter: blur(var(--qry-blur));
+    border-bottom: 1px solid var(--qry-line-strong); font-weight: 600; color: var(--qry-text-muted);
+    cursor: pointer; user-select: none;
+}
+.qry-table th:hover  { color: var(--qry-text); }
+.qry-table th.sorted { color: var(--qry-blue); }
+.qry-table th.num, .qry-table td.num { text-align: right; font-family: var(--qry-font-mono); }
+.qry-table td.idx, .qry-table th.idx { color: var(--qry-text-subtle); width: 2rem; }
+.qry-table tbody tr { border-bottom: 1px solid var(--qry-line); }
+.qry-table tbody tr:hover { background: var(--qry-tint); }
